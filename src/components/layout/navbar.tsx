@@ -45,16 +45,16 @@ export default function Navbar({ userName, userRole }: { userName?: string; user
     loadRole();
   }, [userRole]);
 
-  const isCoachOrAdmin = role === "coach" || role === "admin";
-  const isAdmin = role === "admin";
+  const isCoachOrAbove = role === "coach" || role === "admin" || role === "master";
+  const isAdminOrMaster = role === "admin" || role === "master";
   const isOnCoachPage = pathname.startsWith("/coach") || pathname.startsWith("/admin");
 
-  const navItems = isOnCoachPage && isCoachOrAdmin
-    ? [...coachItems, ...(isAdmin ? [{ href: "/admin", label: "管理後台" }] : []), { href: "/dashboard", label: "學員端" }]
+  const navItems = isOnCoachPage && isCoachOrAbove
+    ? [...coachItems, ...(isAdminOrMaster ? [{ href: "/admin", label: "管理後台" }] : []), { href: "/dashboard", label: "學員端" }]
     : [
         ...studentItems,
-        ...(isCoachOrAdmin ? [{ href: "/coach", label: "教練後台" }] : []),
-        ...(isAdmin ? [{ href: "/admin", label: "管理後台" }] : []),
+        ...(isCoachOrAbove ? [{ href: "/coach", label: "教練後台" }] : []),
+        ...(isAdminOrMaster ? [{ href: "/admin", label: "管理後台" }] : []),
       ];
 
   async function handleLogout() {
