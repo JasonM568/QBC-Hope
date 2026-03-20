@@ -15,14 +15,20 @@ interface User {
 export default function AdminPanel({
   users,
   coaches,
+  currentUserId,
 }: {
   users: User[];
   coaches: User[];
+  currentUserId: string;
 }) {
   const [updating, setUpdating] = useState<string | null>(null);
   const router = useRouter();
 
   async function updateRole(userId: string, newRole: string) {
+    if (userId === currentUserId) {
+      alert("無法變更自己的角色！");
+      return;
+    }
     setUpdating(userId);
     const supabase = createClient();
     await supabase
@@ -100,7 +106,7 @@ export default function AdminPanel({
                 <select
                   value={user.role}
                   onChange={(e) => updateRole(user.id, e.target.value)}
-                  disabled={updating === user.id}
+                  disabled={updating === user.id || user.id === currentUserId}
                   className="bg-background border border-border rounded-md px-2 py-1 text-sm"
                 >
                   <option value="student">學員</option>

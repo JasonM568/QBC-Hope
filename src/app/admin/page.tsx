@@ -3,7 +3,7 @@ import Navbar from "@/components/layout/navbar";
 import AdminPanel from "./admin-panel";
 
 export default async function AdminPage() {
-  const { profile, supabase } = await requireRole(["admin"]);
+  const { user, profile, supabase } = await requireRole(["admin"]);
 
   const { data: users } = await supabase
     .from("profiles")
@@ -17,7 +17,7 @@ export default async function AdminPage() {
       <Navbar userName={profile.display_name} userRole="admin" />
       <main className="max-w-4xl mx-auto px-4 py-8">
         <h1 className="text-2xl font-bold mb-6">管理員後台</h1>
-        <AdminPanel users={users || []} coaches={coaches} />
+        <AdminPanel users={users || []} coaches={coaches} currentUserId={user.id} />
       </main>
     </div>
   );
