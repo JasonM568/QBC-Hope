@@ -12,16 +12,16 @@ import {
 interface MonthlyData {
   label: string;
   career: number;
-  relationship: number;
-  health: number;
   wealth: number;
-  growth: number;
+  health: number;
+  family: number;
+  relation: number;
 }
 
 interface DailyData {
   date: string;
   energy: number;
-  mood: number;
+  score: number;
 }
 
 export default function HistoryPage() {
@@ -52,10 +52,10 @@ export default function HistoryPage() {
         const trend = monthly.map((m) => ({
           label: `${m.year}/${m.month}`,
           career: m.career_score,
-          relationship: m.relationship_score,
-          health: m.health_score,
           wealth: m.wealth_score,
-          growth: m.growth_score,
+          health: m.health_score,
+          family: m.family_score,
+          relation: m.relation_score,
         }));
         setMonthlyData(trend);
 
@@ -63,17 +63,17 @@ export default function HistoryPage() {
         const latest = monthly[monthly.length - 1];
         setRadarData([
           { domain: "事業", score: latest.career_score },
-          { domain: "關係", score: latest.relationship_score },
+          { domain: "財富", score: latest.wealth_score },
           { domain: "健康", score: latest.health_score },
-          { domain: "財務", score: latest.wealth_score },
-          { domain: "成長", score: latest.growth_score },
+          { domain: "家庭", score: latest.family_score },
+          { domain: "關係", score: latest.relation_score },
         ]);
       }
 
-      // Load daily reports for energy/mood trend
+      // Load daily reports for energy/score trend
       const { data: daily } = await supabase
         .from("daily_reports")
-        .select("report_date, energy_level, mood_score")
+        .select("report_date, energy_state, daily_score")
         .eq("user_id", user.id)
         .order("report_date", { ascending: true })
         .limit(30);
@@ -81,8 +81,8 @@ export default function HistoryPage() {
       if (daily) {
         setDailyData(daily.map((d) => ({
           date: d.report_date,
-          energy: d.energy_level,
-          mood: d.mood_score,
+          energy: d.energy_state,
+          score: d.daily_score,
         })));
       }
 
@@ -141,7 +141,7 @@ export default function HistoryPage() {
                   <RadarChart data={radarData}>
                     <PolarGrid stroke="hsl(0 0% 25%)" />
                     <PolarAngleAxis dataKey="domain" tick={{ fill: "hsl(40 10% 70%)", fontSize: 14 }} />
-                    <PolarRadiusAxis angle={90} domain={[0, 10]} tick={{ fill: "hsl(40 5% 55%)", fontSize: 11 }} />
+                    <PolarRadiusAxis angle={90} domain={[0, 20]} tick={{ fill: "hsl(40 5% 55%)", fontSize: 11 }} />
                     <Radar name="評分" dataKey="score" stroke="#D4AF37" fill="#D4AF37" fillOpacity={0.3} />
                   </RadarChart>
                 </ResponsiveContainer>
@@ -162,13 +162,13 @@ export default function HistoryPage() {
                   <LineChart data={monthlyData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(0 0% 20%)" />
                     <XAxis dataKey="label" tick={{ fill: "hsl(40 5% 55%)", fontSize: 12 }} />
-                    <YAxis domain={[0, 10]} tick={{ fill: "hsl(40 5% 55%)", fontSize: 12 }} />
+                    <YAxis domain={[0, 20]} tick={{ fill: "hsl(40 5% 55%)", fontSize: 12 }} />
                     <Tooltip contentStyle={{ backgroundColor: "hsl(0 0% 8%)", border: "1px solid hsl(0 0% 18%)", borderRadius: 8 }} />
                     <Line type="monotone" dataKey="career" name="事業" stroke="#D4AF37" strokeWidth={2} />
-                    <Line type="monotone" dataKey="relationship" name="關係" stroke="#60A5FA" strokeWidth={2} />
+                    <Line type="monotone" dataKey="wealth" name="財富" stroke="#F472B6" strokeWidth={2} />
                     <Line type="monotone" dataKey="health" name="健康" stroke="#34D399" strokeWidth={2} />
-                    <Line type="monotone" dataKey="wealth" name="財務" stroke="#F472B6" strokeWidth={2} />
-                    <Line type="monotone" dataKey="growth" name="成長" stroke="#A78BFA" strokeWidth={2} />
+                    <Line type="monotone" dataKey="family" name="家庭" stroke="#60A5FA" strokeWidth={2} />
+                    <Line type="monotone" dataKey="relation" name="關係" stroke="#A78BFA" strokeWidth={2} />
                   </LineChart>
                 </ResponsiveContainer>
               </>
@@ -178,20 +178,20 @@ export default function HistoryPage() {
           </div>
         )}
 
-        {/* Daily Energy/Mood */}
+        {/* Daily Energy/Score */}
         {activeTab === "daily" && (
           <div className="p-6 rounded-xl border border-border bg-card">
             {dailyData.length > 0 ? (
               <>
-                <h2 className="font-semibold mb-4">每日精力 & 心情曲線（近 30 天）</h2>
+                <h2 className="font-semibold mb-4">每日能量 & 評分曲線（近 30 天）</h2>
                 <ResponsiveContainer width="100%" height={400}>
                   <LineChart data={dailyData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(0 0% 20%)" />
                     <XAxis dataKey="date" tick={{ fill: "hsl(40 5% 55%)", fontSize: 11 }} />
                     <YAxis domain={[0, 10]} tick={{ fill: "hsl(40 5% 55%)", fontSize: 12 }} />
                     <Tooltip contentStyle={{ backgroundColor: "hsl(0 0% 8%)", border: "1px solid hsl(0 0% 18%)", borderRadius: 8 }} />
-                    <Line type="monotone" dataKey="energy" name="精力" stroke="#D4AF37" strokeWidth={2} dot={{ fill: "#D4AF37" }} />
-                    <Line type="monotone" dataKey="mood" name="心情" stroke="#60A5FA" strokeWidth={2} dot={{ fill: "#60A5FA" }} />
+                    <Line type="monotone" dataKey="energy" name="能量狀態" stroke="#D4AF37" strokeWidth={2} dot={{ fill: "#D4AF37" }} />
+                    <Line type="monotone" dataKey="score" name="今日評分" stroke="#60A5FA" strokeWidth={2} dot={{ fill: "#60A5FA" }} />
                   </LineChart>
                 </ResponsiveContainer>
               </>

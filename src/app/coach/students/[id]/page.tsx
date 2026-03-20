@@ -131,20 +131,21 @@ export default async function StudentDetailPage({
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm font-semibold">{r.report_date}</span>
                       <div className="flex gap-3 text-xs">
-                        <span className="text-gold">精力 {r.energy_level}</span>
-                        <span className="text-blue-400">心情 {r.mood_score}</span>
+                        <span className="text-gold">能量 {r.energy_state}</span>
+                        <span className="text-blue-400">評分 {r.daily_score}</span>
+                        {r.day_number && <span className="text-muted-foreground">第{r.day_number}天</span>}
                       </div>
                     </div>
-                    {r.today_goals && (
+                    {r.most_important_thing && (
                       <div className="mt-2">
-                        <p className="text-xs text-muted-foreground">今日目標</p>
-                        <p className="text-sm text-foreground/80 whitespace-pre-wrap">{r.today_goals}</p>
+                        <p className="text-xs text-muted-foreground">今天最重要的一件事</p>
+                        <p className="text-sm text-foreground/80 whitespace-pre-wrap">{r.most_important_thing}</p>
                       </div>
                     )}
-                    {r.reflection && (
+                    {r.awareness_improve && (
                       <div className="mt-2">
-                        <p className="text-xs text-muted-foreground">反思</p>
-                        <p className="text-sm text-foreground/80 whitespace-pre-wrap">{r.reflection}</p>
+                        <p className="text-xs text-muted-foreground">今日覺察</p>
+                        <p className="text-sm text-foreground/80 whitespace-pre-wrap">{r.awareness_improve}</p>
                       </div>
                     )}
                   </div>
@@ -163,20 +164,20 @@ export default async function StudentDetailPage({
                 <div className="p-4 rounded-xl border border-border bg-card space-y-2">
                   {[
                     { label: "事業", score: monthly.career_score },
-                    { label: "關係", score: monthly.relationship_score },
+                    { label: "財富", score: monthly.wealth_score },
                     { label: "健康", score: monthly.health_score },
-                    { label: "財務", score: monthly.wealth_score },
-                    { label: "成長", score: monthly.growth_score },
+                    { label: "家庭", score: monthly.family_score },
+                    { label: "關係", score: monthly.relation_score },
                   ].map((d) => (
                     <div key={d.label} className="flex items-center gap-3">
                       <span className="text-sm w-12 text-muted-foreground">{d.label}</span>
                       <div className="flex-1 h-2 bg-secondary rounded-full overflow-hidden">
                         <div
                           className="h-full bg-gold rounded-full"
-                          style={{ width: `${(d.score || 0) * 10}%` }}
+                          style={{ width: `${((d.score || 0) / 20) * 100}%` }}
                         />
                       </div>
-                      <span className="text-sm font-semibold w-6 text-right">{d.score}</span>
+                      <span className="text-sm font-semibold w-8 text-right">{d.score}/20</span>
                     </div>
                   ))}
                 </div>

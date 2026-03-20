@@ -61,9 +61,9 @@ export async function GET(request: Request) {
     `尚未繳交的學員：`,
     names,
     ``,
-    `📝 立即填寫：https://qbc-hope.vercel.app/forms/daily`,
+    `📝 立即填寫：https://hope.huangxi.info/forms/daily`,
     ``,
-    `加油！完成今天的四步循環 💪`,
+    `加油！完成今天的日報 💪`,
   ].join("\n");
 
   await sendToAllGroups(message);

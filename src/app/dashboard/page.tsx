@@ -92,7 +92,7 @@ export default async function DashboardPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <Link href="/forms/daily" className="p-5 rounded-xl border border-border bg-card card-hover group">
             <h3 className="font-semibold text-foreground group-hover:text-gold transition-colors">21天行動日報表</h3>
-            <p className="text-muted-foreground text-sm mt-1">{todayReport ? "今日已完成" : "每日四步循環"}</p>
+            <p className="text-muted-foreground text-sm mt-1">{todayReport ? "今日已完成" : "每日八大 PART"}</p>
           </Link>
           <Link href="/forms/capital" className="p-5 rounded-xl border border-border bg-card card-hover group">
             <h3 className="font-semibold text-foreground group-hover:text-gold transition-colors">人生資本盤點表</h3>
