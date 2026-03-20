@@ -43,7 +43,7 @@ export async function POST(request: Request) {
       await sendLineMessage(groupId, [
         {
           type: "text",
-          text: "🌟 HOPE 人生作業系統已加入群組！\n\n每天晚上 21:00 會自動提醒尚未繳交日報的學員。\n\n📝 填寫日報：https://qbc-hope.vercel.app/forms/daily",
+          text: "🌟 HOPE 人生作業系統已加入群組！\n\n每天晚上 21:00 會自動提醒尚未繳交日報的學員。\n\n📝 填寫日報：https://hope.huangxi.info/forms/daily",
         },
       ]);
     }
