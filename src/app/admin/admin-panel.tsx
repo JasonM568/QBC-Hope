@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+
 interface User {
   id: string;
   display_name: string;
@@ -11,6 +12,14 @@ interface User {
   coach_id: string | null;
   created_at: string;
 }
+
+interface NotificationConfig {
+  enabled: boolean;
+  skip_days: number[];
+  message_prefix: string;
+}
+
+const dayLabels = ["日", "一", "二", "三", "四", "五", "六"];
 
 export default function AdminPanel({
   users,
@@ -22,7 +31,29 @@ export default function AdminPanel({
   currentUserId: string;
 }) {
   const [updating, setUpdating] = useState<string | null>(null);
+  const [notifConfig, setNotifConfig] = useState<NotificationConfig>({
+    enabled: true,
+    skip_days: [0, 6],
+    message_prefix: "📋 HOPE 日報提醒",
+  });
+  const [notifSaving, setNotifSaving] = useState(false);
+  const [notifMessage, setNotifMessage] = useState("");
   const router = useRouter();
+
+  useEffect(() => {
+    async function loadSettings() {
+      const supabase = createClient();
+      const { data } = await supabase
+        .from("notification_settings")
+        .select("setting_value")
+        .eq("setting_key", "daily_reminder")
+        .single();
+      if (data?.setting_value) {
+        setNotifConfig(data.setting_value);
+      }
+    }
+    loadSettings();
+  }, []);
 
   async function updateRole(userId: string, newRole: string) {
     if (userId === currentUserId) {
@@ -48,6 +79,35 @@ export default function AdminPanel({
       .eq("id", studentId);
     setUpdating(null);
     router.refresh();
+  }
+
+  function toggleSkipDay(day: number) {
+    setNotifConfig((prev) => ({
+      ...prev,
+      skip_days: prev.skip_days.includes(day)
+        ? prev.skip_days.filter((d) => d !== day)
+        : [...prev.skip_days, day].sort(),
+    }));
+  }
+
+  async function saveNotifSettings() {
+    setNotifSaving(true);
+    setNotifMessage("");
+    const supabase = createClient();
+    const { error } = await supabase
+      .from("notification_settings")
+      .update({
+        setting_value: notifConfig,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("setting_key", "daily_reminder");
+
+    if (error) {
+      setNotifMessage("儲存失敗：" + error.message);
+    } else {
+      setNotifMessage("通知設定已儲存！");
+    }
+    setNotifSaving(false);
   }
 
   const roleLabels: Record<string, string> = {
@@ -79,6 +139,83 @@ export default function AdminPanel({
           <p className="text-2xl font-bold text-gold">
             {users.filter((u) => u.role === "student").length}
           </p>
+        </div>
+      </div>
+
+      {/* LINE Notification Settings */}
+      <h2 className="text-lg font-semibold mb-4">LINE 通知設定</h2>
+      <div className="p-6 rounded-xl border border-border bg-card mb-8 space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="font-medium">每日日報提醒</p>
+            <p className="text-sm text-muted-foreground">每天 21:00（台灣時間）在 LINE 群組提醒</p>
+          </div>
+          <button
+            onClick={() => setNotifConfig((prev) => ({ ...prev, enabled: !prev.enabled }))}
+            className={`relative w-12 h-6 rounded-full transition-colors ${
+              notifConfig.enabled ? "bg-gold" : "bg-secondary"
+            }`}
+          >
+            <span
+              className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform ${
+                notifConfig.enabled ? "left-6" : "left-0.5"
+              }`}
+            />
+          </button>
+        </div>
+
+        {notifConfig.enabled && (
+          <>
+            <div>
+              <p className="text-sm font-medium mb-2">不發送通知的日子</p>
+              <div className="flex gap-2">
+                {dayLabels.map((label, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => toggleSkipDay(idx)}
+                    className={`w-10 h-10 rounded-lg text-sm font-medium transition-colors ${
+                      notifConfig.skip_days.includes(idx)
+                        ? "bg-red-400/20 text-red-400 border border-red-400/30"
+                        : "bg-green-400/10 text-green-400 border border-green-400/20"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                紅色 = 不發送，綠色 = 發送。目前設定：
+                {notifConfig.skip_days.length === 0
+                  ? "每天都發送"
+                  : `週${notifConfig.skip_days.map((d) => dayLabels[d]).join("、")}不發送`}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-sm font-medium mb-1">訊息前綴</p>
+              <input
+                type="text"
+                value={notifConfig.message_prefix}
+                onChange={(e) => setNotifConfig((prev) => ({ ...prev, message_prefix: e.target.value }))}
+                className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm"
+              />
+            </div>
+          </>
+        )}
+
+        <div className="flex items-center gap-3">
+          <button
+            onClick={saveNotifSettings}
+            disabled={notifSaving}
+            className="px-4 py-2 bg-gold text-black rounded-lg text-sm font-semibold hover:bg-gold-light transition-colors disabled:opacity-50"
+          >
+            {notifSaving ? "儲存中..." : "儲存通知設定"}
+          </button>
+          {notifMessage && (
+            <span className={`text-sm ${notifMessage.includes("失敗") ? "text-red-400" : "text-green-400"}`}>
+              {notifMessage}
+            </span>
+          )}
         </div>
       </div>
 

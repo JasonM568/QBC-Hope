@@ -50,6 +50,14 @@ export default async function DashboardPage() {
     }
   }
 
+  // Get recent coach feedback
+  const { data: coachFeedback } = await supabase
+    .from("coach_notes")
+    .select("id, content, note_type, created_at, coach_id, profiles!coach_notes_coach_id_fkey(display_name)")
+    .eq("student_id", user.id)
+    .order("created_at", { ascending: false })
+    .limit(5);
+
   return (
     <div className="min-h-screen">
       <Navbar userName={displayName} />
@@ -115,6 +123,39 @@ export default async function DashboardPage() {
             <p className="text-muted-foreground text-sm mt-1">雷達圖與趨勢分析</p>
           </Link>
         </div>
+
+        {/* Coach Feedback */}
+        {coachFeedback && coachFeedback.length > 0 && (
+          <div className="mt-8">
+            <h2 className="text-lg font-semibold mb-4">教練回饋</h2>
+            <div className="space-y-3">
+              {coachFeedback.map((note: { id: string; content: string; note_type: string; created_at: string; profiles: { display_name: string }[] }) => (
+                <div key={note.id} className="p-4 rounded-xl border border-border bg-card">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${
+                        note.note_type === "alert"
+                          ? "bg-red-400/10 text-red-400"
+                          : note.note_type === "memo"
+                          ? "bg-blue-400/10 text-blue-400"
+                          : "bg-gold/10 text-gold"
+                      }`}>
+                        {note.note_type === "alert" ? "提醒" : note.note_type === "memo" ? "備忘" : "回饋"}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        來自 {note.profiles?.[0]?.display_name || "教練"}
+                      </span>
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(note.created_at).toLocaleDateString("zh-TW")}
+                    </span>
+                  </div>
+                  <p className="text-sm text-foreground/90 whitespace-pre-wrap">{note.content}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Community */}
         <Link href="/community" className="block mt-6 p-5 rounded-xl border border-border bg-card card-hover group">

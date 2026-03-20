@@ -13,7 +13,29 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const today = new Date().toISOString().split("T")[0];
+  // Check notification settings
+  const { data: settings } = await supabase
+    .from("notification_settings")
+    .select("setting_value")
+    .eq("setting_key", "daily_reminder")
+    .single();
+
+  const config = settings?.setting_value || { enabled: true, skip_days: [] };
+
+  if (!config.enabled) {
+    return NextResponse.json({ message: "Notifications disabled" });
+  }
+
+  // Check if today should be skipped (Taiwan time = UTC+8)
+  const now = new Date();
+  const adjustedDate = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+  const dayOfWeek = adjustedDate.getUTCDay(); // 0=Sunday, 6=Saturday
+
+  if (config.skip_days && config.skip_days.includes(dayOfWeek)) {
+    return NextResponse.json({ message: `Skipped (day ${dayOfWeek} is in skip list)` });
+  }
+
+  const today = adjustedDate.toISOString().split("T")[0];
 
   // Get all active students
   const { data: students } = await supabase
@@ -37,23 +59,22 @@ export async function GET(request: Request) {
   const missingStudents = students.filter((s) => !submittedUserIds.has(s.id));
 
   if (missingStudents.length === 0) {
-    // Everyone submitted! Send congratulations
     await sendToAllGroups(
       `🎉 太棒了！今天（${today}）所有學員都已完成日報！\n\n繼續保持，你們都很棒！💪`
     );
     return NextResponse.json({ message: "All students submitted", date: today });
   }
 
-  // Build reminder message
   const names = missingStudents
     .map((s) => s.display_name || "未設定名稱")
     .join("、");
 
   const submitted = students.length - missingStudents.length;
   const total = students.length;
+  const prefix = config.message_prefix || "📋 HOPE 日報提醒";
 
   const message = [
-    `📋 HOPE 日報提醒（${today}）`,
+    `${prefix}（${today}）`,
     ``,
     `✅ 已繳交：${submitted}/${total} 人`,
     `❌ 尚未繳交：${missingStudents.length} 人`,
