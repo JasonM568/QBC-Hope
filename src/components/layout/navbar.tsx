@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
+import IdleTimeout from "@/components/idle-timeout";
 
 const studentItems = [
   { href: "/dashboard", label: "儀表板" },
@@ -65,6 +66,7 @@ export default function Navbar({ userName, userRole }: { userName?: string; user
 
   return (
     <nav className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
+      <IdleTimeout />
       <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
         <Link href="/dashboard" className="text-xl font-bold text-gold-gradient">
           HOPE
