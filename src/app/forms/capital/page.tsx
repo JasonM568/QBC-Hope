@@ -10,33 +10,115 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { exportPDF } from "@/lib/export-pdf";
 
-const capitals = [
-  { key: "health", label: "健康資本", desc: "身體狀態、體能、心理健康" },
-  { key: "relationship", label: "關係資本", desc: "家庭、友誼、人脈、社群" },
-  { key: "financial", label: "財務資本", desc: "收入、儲蓄、投資、財務自由度" },
-  { key: "knowledge", label: "知識資本", desc: "技能、學歷、專業能力、持續學習" },
-] as const;
+function Checkbox({ checked, onChange, label, disabled }: {
+  checked: boolean; onChange: (v: boolean) => void; label: string; disabled?: boolean;
+}) {
+  return (
+    <label className="flex items-center gap-2 cursor-pointer select-none">
+      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} disabled={disabled} className="w-4 h-4 rounded border-border accent-gold" />
+      <span className="text-sm">{label}</span>
+    </label>
+  );
+}
 
-type CapitalKey = typeof capitals[number]["key"];
+function Radio({ name, value, checked, onChange, label, disabled }: {
+  name: string; value: string; checked: boolean; onChange: (v: string) => void; label: string; disabled?: boolean;
+}) {
+  return (
+    <label className="flex items-center gap-1.5 cursor-pointer">
+      <input type="radio" name={name} checked={checked} onChange={() => onChange(value)} disabled={disabled} className="accent-gold" />
+      <span className="text-sm">{label}</span>
+    </label>
+  );
+}
+
+function PartHeader({ num, title, subtitle }: { num: number; title: string; subtitle: string }) {
+  return (
+    <div className="mb-4">
+      <h2 className="font-semibold text-gold text-lg">PART {num} {title}</h2>
+      <p className="text-sm text-muted-foreground">{subtitle}</p>
+    </div>
+  );
+}
+
+interface CapitalForm {
+  current_job: string;
+  life_goal: string;
+  inventory_cycle: string;
+  // P1
+  eco_income_source: string;
+  eco_score_a: number;
+  eco_income_stability: string;
+  eco_asset_amount: string;
+  eco_asset_cash: boolean;
+  eco_asset_stock: boolean;
+  eco_asset_realestate: boolean;
+  eco_asset_equity: boolean;
+  eco_asset_other: boolean;
+  eco_score_b: number;
+  // P2
+  know_core_expertise: string;
+  know_score_a: number;
+  know_books_per_year: number;
+  know_courses_per_year: number;
+  know_score_b: number;
+  // P3
+  social_key_people: string;
+  social_score_a: number;
+  social_cooperate: boolean;
+  social_introduce: boolean;
+  social_invest: boolean;
+  social_score_b: number;
+  // P4
+  psych_difficulty: string;
+  psych_score_a: number;
+  psych_future: string;
+  psych_score_b: number;
+  // 總評
+  overall_evaluation: string;
+  // 成長計劃
+  growth_plan_economic: string;
+  growth_plan_knowledge: string;
+  growth_plan_social: string;
+  growth_plan_psychological: string;
+  // 前後比較
+  before_economic: number;
+  before_knowledge: number;
+  before_social: number;
+  before_psychological: number;
+  after_economic: number;
+  after_knowledge: number;
+  after_social: number;
+  after_psychological: number;
+  has_grown: string;
+  growth_reflection: string;
+}
+
+const emptyForm: CapitalForm = {
+  current_job: "", life_goal: "", inventory_cycle: "first",
+  eco_income_source: "", eco_score_a: 5, eco_income_stability: "moderate",
+  eco_asset_amount: "", eco_asset_cash: false, eco_asset_stock: false,
+  eco_asset_realestate: false, eco_asset_equity: false, eco_asset_other: false, eco_score_b: 8,
+  know_core_expertise: "", know_score_a: 5, know_books_per_year: 0, know_courses_per_year: 0, know_score_b: 8,
+  social_key_people: "", social_score_a: 5, social_cooperate: false, social_introduce: false, social_invest: false, social_score_b: 8,
+  psych_difficulty: "need_time", psych_score_a: 8, psych_future: "normal", psych_score_b: 5,
+  overall_evaluation: "beginner",
+  growth_plan_economic: "", growth_plan_knowledge: "", growth_plan_social: "", growth_plan_psychological: "",
+  before_economic: 0, before_knowledge: 0, before_social: 0, before_psychological: 0,
+  after_economic: 0, after_knowledge: 0, after_social: 0, after_psychological: 0,
+  has_grown: "", growth_reflection: "",
+};
 
 export default function CapitalInventoryPage() {
-  const [scores, setScores] = useState<Record<CapitalKey, number>>({
-    health: 5, relationship: 5, financial: 5, knowledge: 5,
-  });
-  const [notes, setNotes] = useState<Record<CapitalKey, string>>({
-    health: "", relationship: "", financial: "", knowledge: "",
-  });
-  const [periodLabel, setPeriodLabel] = useState(() => {
-    const now = new Date();
-    const half = now.getMonth() < 6 ? "上半年" : "下半年";
-    return `${now.getFullYear()} ${half}`;
-  });
-  const [overallReflection, setOverallReflection] = useState("");
+  const [form, setForm] = useState<CapitalForm>(emptyForm);
   const [userName, setUserName] = useState("");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+
+  const set = <K extends keyof CapitalForm>(key: K, value: CapitalForm[K]) =>
+    setForm((prev) => ({ ...prev, [key]: value }));
 
   useEffect(() => {
     async function load() {
@@ -49,27 +131,23 @@ export default function CapitalInventoryPage() {
     load();
   }, [router]);
 
+  const ecoTotal = form.eco_score_a + form.eco_score_b;
+  const knowTotal = form.know_score_a + form.know_score_b;
+  const socialTotal = form.social_score_a + form.social_score_b;
+  const psychTotal = form.psych_score_a + form.psych_score_b;
+  const grandTotal = ecoTotal + knowTotal + socialTotal + psychTotal;
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
     setMessage("");
-
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
     const { error } = await supabase.from("capital_inventories").insert({
       user_id: user.id,
-      period_label: periodLabel,
-      health_score: scores.health,
-      health_note: notes.health,
-      relationship_score: scores.relationship,
-      relationship_note: notes.relationship,
-      financial_score: scores.financial,
-      financial_note: notes.financial,
-      knowledge_score: scores.knowledge,
-      knowledge_note: notes.knowledge,
-      overall_reflection: overallReflection,
+      ...form,
     });
 
     if (error) {
@@ -97,64 +175,276 @@ export default function CapitalInventoryPage() {
       <main className="max-w-2xl mx-auto px-4 py-8">
         <div className="mb-6">
           <h1 className="text-2xl font-bold">人生資本盤點表</h1>
-          <p className="text-muted-foreground mt-1">盤點你的四大人生資本</p>
+          <p className="text-muted-foreground mt-1">Personal Life Capital Inventory</p>
+          <p className="text-gold mt-2 font-medium">理念：每個人都是一個經濟體，你的價值來自四種資本。</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="p-4 rounded-xl border border-border bg-card">
-            <Label htmlFor="period">盤點期別</Label>
-            <Input
-              id="period"
-              value={periodLabel}
-              onChange={(e) => setPeriodLabel(e.target.value)}
-              className="mt-2 bg-background border-border"
-            />
-          </div>
-
-          {capitals.map((c) => (
-            <div key={c.key} className="p-6 rounded-xl border border-border bg-card">
-              <h2 className="font-semibold text-gold mb-1">{c.label}</h2>
-              <p className="text-muted-foreground text-sm mb-4">{c.desc}</p>
-              <div className="mb-4">
-                <Label>評分 (1-10)：{scores[c.key]}</Label>
-                <input
-                  type="range"
-                  min={1}
-                  max={10}
-                  value={scores[c.key]}
-                  onChange={(e) => setScores({ ...scores, [c.key]: parseInt(e.target.value) })}
-                  className="w-full mt-2 accent-gold"
-                />
-                <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                  <span>1</span><span>5</span><span>10</span>
+          {/* Header */}
+          <div className="p-6 rounded-xl border border-border bg-card space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>目前工作說明</Label>
+                <Input value={form.current_job} onChange={(e) => set("current_job", e.target.value)} className="mt-1 bg-background border-border" />
+              </div>
+              <div>
+                <Label>盤點週期</Label>
+                <div className="flex flex-col gap-1.5 mt-2">
+                  <Radio name="cycle" value="first" checked={form.inventory_cycle === "first"} onChange={(v) => set("inventory_cycle", v)} label="第一次盤點" />
+                  <Radio name="cycle" value="half_year" checked={form.inventory_cycle === "half_year"} onChange={(v) => set("inventory_cycle", v)} label="半年更新" />
+                  <Radio name="cycle" value="annual" checked={form.inventory_cycle === "annual"} onChange={(v) => set("inventory_cycle", v)} label="年度回顧" />
                 </div>
               </div>
-              <Label>說明與反思</Label>
-              <Textarea
-                value={notes[c.key]}
-                onChange={(e) => setNotes({ ...notes, [c.key]: e.target.value })}
-                placeholder={`關於${c.label}的現況與想法...`}
-                rows={3}
-                className="mt-2 bg-background border-border"
-              />
             </div>
-          ))}
+            <div>
+              <Label>人生目標</Label>
+              <Textarea value={form.life_goal} onChange={(e) => set("life_goal", e.target.value)} rows={2} className="mt-1 bg-background border-border" />
+            </div>
+          </div>
 
-          <div className="p-6 rounded-xl border border-border bg-card">
-            <Label>整體反思</Label>
-            <Textarea
-              value={overallReflection}
-              onChange={(e) => setOverallReflection(e.target.value)}
-              placeholder="綜合四大資本，你覺得目前最需要加強的是？"
-              rows={4}
-              className="mt-2 bg-background border-border"
-            />
+          {/* PART 1 經濟資本 */}
+          <div className="p-6 rounded-xl border border-border bg-card space-y-4">
+            <PartHeader num={1} title="經濟資本" subtitle="Economic Capital" />
+            <div>
+              <Label>目前主要收入來源和年收入金額</Label>
+              <Textarea value={form.eco_income_source} onChange={(e) => set("eco_income_source", e.target.value)} rows={2} className="mt-1 bg-background border-border" />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>評分 A (1-10)：{form.eco_score_a}</Label>
+                <input type="range" min={1} max={10} value={form.eco_score_a} onChange={(e) => set("eco_score_a", parseInt(e.target.value))} className="w-full mt-1 accent-gold" />
+              </div>
+              <div>
+                <Label>收入穩定度</Label>
+                <div className="flex flex-col gap-1 mt-1">
+                  <Radio name="stability" value="stable" checked={form.eco_income_stability === "stable"} onChange={(v) => set("eco_income_stability", v)} label="穩定" />
+                  <Radio name="stability" value="moderate" checked={form.eco_income_stability === "moderate"} onChange={(v) => set("eco_income_stability", v)} label="中等" />
+                  <Radio name="stability" value="unstable" checked={form.eco_income_stability === "unstable"} onChange={(v) => set("eco_income_stability", v)} label="不穩定" />
+                </div>
+              </div>
+            </div>
+            <div>
+              <Label>擁有資產總金額</Label>
+              <Input value={form.eco_asset_amount} onChange={(e) => set("eco_asset_amount", e.target.value)} className="mt-1 bg-background border-border" />
+            </div>
+            <div>
+              <Label className="mb-2 block">目前資產類型</Label>
+              <div className="flex flex-wrap gap-4">
+                <Checkbox checked={form.eco_asset_cash} onChange={(v) => set("eco_asset_cash", v)} label="現金" />
+                <Checkbox checked={form.eco_asset_stock} onChange={(v) => set("eco_asset_stock", v)} label="股票" />
+                <Checkbox checked={form.eco_asset_realestate} onChange={(v) => set("eco_asset_realestate", v)} label="不動產" />
+                <Checkbox checked={form.eco_asset_equity} onChange={(v) => set("eco_asset_equity", v)} label="公司股權" />
+                <Checkbox checked={form.eco_asset_other} onChange={(v) => set("eco_asset_other", v)} label="其他" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>評分 B (1-15)：{form.eco_score_b}</Label>
+                <input type="range" min={1} max={15} value={form.eco_score_b} onChange={(e) => set("eco_score_b", parseInt(e.target.value))} className="w-full mt-1 accent-gold" />
+              </div>
+              <div className="flex items-end">
+                <p className="text-gold font-bold text-lg">總分 A+B = {ecoTotal}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* PART 2 智識資本 */}
+          <div className="p-6 rounded-xl border border-border bg-card space-y-4">
+            <PartHeader num={2} title="智識資本" subtitle="Knowledge Capital" />
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>你的核心專業</Label>
+                <Textarea value={form.know_core_expertise} onChange={(e) => set("know_core_expertise", e.target.value)} rows={2} className="mt-1 bg-background border-border" />
+              </div>
+              <div>
+                <Label>評分 A (1-10)：{form.know_score_a}</Label>
+                <input type="range" min={1} max={10} value={form.know_score_a} onChange={(e) => set("know_score_a", parseInt(e.target.value))} className="w-full mt-1 accent-gold" />
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <Label>每年閱讀（本書）</Label>
+                <Input type="number" min={0} value={form.know_books_per_year} onChange={(e) => set("know_books_per_year", parseInt(e.target.value) || 0)} className="mt-1 bg-background border-border" />
+              </div>
+              <div>
+                <Label>每年學習（個課）</Label>
+                <Input type="number" min={0} value={form.know_courses_per_year} onChange={(e) => set("know_courses_per_year", parseInt(e.target.value) || 0)} className="mt-1 bg-background border-border" />
+              </div>
+              <div>
+                <Label>評分 B (1-15)：{form.know_score_b}</Label>
+                <input type="range" min={1} max={15} value={form.know_score_b} onChange={(e) => set("know_score_b", parseInt(e.target.value))} className="w-full mt-1 accent-gold" />
+              </div>
+            </div>
+            <p className="text-gold font-bold text-lg">總分 A+B = {knowTotal}</p>
+          </div>
+
+          {/* PART 3 社會資本 */}
+          <div className="p-6 rounded-xl border border-border bg-card space-y-4">
+            <PartHeader num={3} title="社會資本" subtitle="Social Capital" />
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>你認識的關鍵人物</Label>
+                <Textarea value={form.social_key_people} onChange={(e) => set("social_key_people", e.target.value)} rows={2} className="mt-1 bg-background border-border" />
+              </div>
+              <div>
+                <Label>評分 A (1-10)：{form.social_score_a}</Label>
+                <input type="range" min={1} max={10} value={form.social_score_a} onChange={(e) => set("social_score_a", parseInt(e.target.value))} className="w-full mt-1 accent-gold" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <div className="flex flex-col gap-1.5">
+                  <Checkbox checked={form.social_cooperate} onChange={(v) => set("social_cooperate", v)} label="願意與你合作" />
+                  <Checkbox checked={form.social_introduce} onChange={(v) => set("social_introduce", v)} label="願意介紹資源" />
+                  <Checkbox checked={form.social_invest} onChange={(v) => set("social_invest", v)} label="願意投資你" />
+                </div>
+              </div>
+              <div>
+                <Label>評分 B (1-15)：{form.social_score_b}</Label>
+                <input type="range" min={1} max={15} value={form.social_score_b} onChange={(e) => set("social_score_b", parseInt(e.target.value))} className="w-full mt-1 accent-gold" />
+              </div>
+            </div>
+            <p className="text-gold font-bold text-lg">總分 A+B = {socialTotal}</p>
+          </div>
+
+          {/* PART 4 心理資本 */}
+          <div className="p-6 rounded-xl border border-border bg-card space-y-4">
+            <PartHeader num={4} title="心理資本" subtitle="Psychological Capital" />
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>遇到困難時</Label>
+                <div className="flex flex-col gap-1 mt-1">
+                  <Radio name="difficulty" value="quick_recover" checked={form.psych_difficulty === "quick_recover"} onChange={(v) => set("psych_difficulty", v)} label="很快恢復" />
+                  <Radio name="difficulty" value="need_time" checked={form.psych_difficulty === "need_time"} onChange={(v) => set("psych_difficulty", v)} label="需要時間" />
+                  <Radio name="difficulty" value="give_up" checked={form.psych_difficulty === "give_up"} onChange={(v) => set("psych_difficulty", v)} label="容易放棄" />
+                </div>
+              </div>
+              <div>
+                <Label>評分 A (1-15)：{form.psych_score_a}</Label>
+                <input type="range" min={1} max={15} value={form.psych_score_a} onChange={(e) => set("psych_score_a", parseInt(e.target.value))} className="w-full mt-1 accent-gold" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>你對未來</Label>
+                <div className="flex flex-col gap-1 mt-1">
+                  <Radio name="future" value="very_confident" checked={form.psych_future === "very_confident"} onChange={(v) => set("psych_future", v)} label="非常有信心" />
+                  <Radio name="future" value="normal" checked={form.psych_future === "normal"} onChange={(v) => set("psych_future", v)} label="一般" />
+                  <Radio name="future" value="uncertain" checked={form.psych_future === "uncertain"} onChange={(v) => set("psych_future", v)} label="不確定" />
+                </div>
+              </div>
+              <div>
+                <Label>評分 B (1-10)：{form.psych_score_b}</Label>
+                <input type="range" min={1} max={10} value={form.psych_score_b} onChange={(e) => set("psych_score_b", parseInt(e.target.value))} className="w-full mt-1 accent-gold" />
+              </div>
+            </div>
+            <p className="text-gold font-bold text-lg">總分 A+B = {psychTotal}</p>
+          </div>
+
+          {/* 人生資本總評 */}
+          <div className="p-6 rounded-xl border border-gold/30 bg-card space-y-4">
+            <h2 className="font-bold text-gold text-lg">人生資本總評 Total Life Capital</h2>
+            <div className="grid grid-cols-5 gap-2 text-center">
+              <div className="p-3 rounded-lg bg-gold/10">
+                <p className="text-xs text-muted-foreground">經濟資本</p>
+                <p className="text-xl font-bold text-gold">{ecoTotal}</p>
+              </div>
+              <div className="p-3 rounded-lg bg-gold/10">
+                <p className="text-xs text-muted-foreground">智慧資本</p>
+                <p className="text-xl font-bold text-gold">{knowTotal}</p>
+              </div>
+              <div className="p-3 rounded-lg bg-gold/10">
+                <p className="text-xs text-muted-foreground">社會資本</p>
+                <p className="text-xl font-bold text-gold">{socialTotal}</p>
+              </div>
+              <div className="p-3 rounded-lg bg-gold/10">
+                <p className="text-xs text-muted-foreground">心理資本</p>
+                <p className="text-xl font-bold text-gold">{psychTotal}</p>
+              </div>
+              <div className="p-3 rounded-lg bg-gold/20">
+                <p className="text-xs text-muted-foreground">總分</p>
+                <p className="text-xl font-bold text-gold">{grandTotal}</p>
+              </div>
+            </div>
+            <div>
+              <Label>總體評價</Label>
+              <div className="flex flex-wrap gap-3 mt-2">
+                <Radio name="eval" value="beginner" checked={form.overall_evaluation === "beginner"} onChange={(v) => set("overall_evaluation", v)} label="初階成長期" />
+                <Radio name="eval" value="stable" checked={form.overall_evaluation === "stable"} onChange={(v) => set("overall_evaluation", v)} label="穩定成長期" />
+                <Radio name="eval" value="fast" checked={form.overall_evaluation === "fast"} onChange={(v) => set("overall_evaluation", v)} label="高速發展期" />
+                <Radio name="eval" value="mature" checked={form.overall_evaluation === "mature"} onChange={(v) => set("overall_evaluation", v)} label="成熟階段" />
+              </div>
+            </div>
+          </div>
+
+          {/* 未來六個月成長計劃 */}
+          <div className="p-6 rounded-xl border border-border bg-card space-y-4">
+            <h2 className="font-bold text-gold text-lg">未來六個月成長計劃</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label>PART 1 經濟資本</Label>
+                <Textarea value={form.growth_plan_economic} onChange={(e) => set("growth_plan_economic", e.target.value)} rows={4} className="mt-1 bg-background border-border" />
+              </div>
+              <div>
+                <Label>PART 2 智識資本</Label>
+                <Textarea value={form.growth_plan_knowledge} onChange={(e) => set("growth_plan_knowledge", e.target.value)} rows={4} className="mt-1 bg-background border-border" />
+              </div>
+              <div>
+                <Label>PART 3 社會資本</Label>
+                <Textarea value={form.growth_plan_social} onChange={(e) => set("growth_plan_social", e.target.value)} rows={4} className="mt-1 bg-background border-border" />
+              </div>
+              <div>
+                <Label>PART 4 心理資本</Label>
+                <Textarea value={form.growth_plan_psychological} onChange={(e) => set("growth_plan_psychological", e.target.value)} rows={4} className="mt-1 bg-background border-border" />
+              </div>
+            </div>
+          </div>
+
+          {/* 前後比較 */}
+          <div className="p-6 rounded-xl border border-border bg-card space-y-4">
+            <h2 className="font-bold text-gold text-lg">人生資本前後回顧比較</h2>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="text-left py-2">人生資本</th>
+                    <th className="text-center py-2">Before</th>
+                    <th className="text-center py-2">After</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[
+                    { label: "經濟資本", bKey: "before_economic" as const, aKey: "after_economic" as const },
+                    { label: "智識資本", bKey: "before_knowledge" as const, aKey: "after_knowledge" as const },
+                    { label: "社會資本", bKey: "before_social" as const, aKey: "after_social" as const },
+                    { label: "心理資本", bKey: "before_psychological" as const, aKey: "after_psychological" as const },
+                  ].map((row) => (
+                    <tr key={row.label} className="border-b border-border/50">
+                      <td className="py-2">{row.label}</td>
+                      <td className="py-2 text-center">
+                        <Input type="number" min={0} value={form[row.bKey]} onChange={(e) => set(row.bKey, parseInt(e.target.value) || 0)} className="w-20 mx-auto text-center bg-background border-border" />
+                      </td>
+                      <td className="py-2 text-center">
+                        <Input type="number" min={0} value={form[row.aKey]} onChange={(e) => set(row.aKey, parseInt(e.target.value) || 0)} className="w-20 mx-auto text-center bg-background border-border" />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="flex items-center gap-4">
+              <Label>是否成長：</Label>
+              <Radio name="grown" value="yes" checked={form.has_grown === "yes"} onChange={(v) => set("has_grown", v)} label="是" />
+              <Radio name="grown" value="no" checked={form.has_grown === "no"} onChange={(v) => set("has_grown", v)} label="否" />
+            </div>
+            <div>
+              <Label>感想</Label>
+              <Textarea value={form.growth_reflection} onChange={(e) => set("growth_reflection", e.target.value)} rows={3} className="mt-1 bg-background border-border" />
+            </div>
           </div>
 
           {message && (
-            <p className={`text-sm ${message.includes("失敗") ? "text-red-400" : "text-green-400"}`}>
-              {message}
-            </p>
+            <p className={`text-sm ${message.includes("失敗") ? "text-red-400" : "text-green-400"}`}>{message}</p>
           )}
 
           <Button type="submit" disabled={saving} className="w-full bg-gold text-black hover:bg-gold-light font-semibold h-12">
@@ -166,18 +456,30 @@ export default function CapitalInventoryPage() {
             onClick={() =>
               exportPDF({
                 reportTitle: "人生資本盤點表",
-                subtitle: periodLabel,
                 date: new Date().toISOString().split("T")[0],
                 userName,
                 sections: [
-                  ...capitals.map((c) => ({
-                    title: c.label,
-                    content: [
-                      { label: "評分", value: `${scores[c.key]} / 10` },
-                      { label: "說明與反思", value: notes[c.key] },
-                    ],
-                  })),
-                  { title: "整體反思", content: overallReflection },
+                  { title: "經濟資本", content: [
+                    { label: "評分 A", value: `${form.eco_score_a} / 10` },
+                    { label: "評分 B", value: `${form.eco_score_b} / 15` },
+                    { label: "總分", value: `${ecoTotal}` },
+                  ]},
+                  { title: "智識資本", content: [
+                    { label: "評分 A", value: `${form.know_score_a} / 10` },
+                    { label: "評分 B", value: `${form.know_score_b} / 15` },
+                    { label: "總分", value: `${knowTotal}` },
+                  ]},
+                  { title: "社會資本", content: [
+                    { label: "評分 A", value: `${form.social_score_a} / 10` },
+                    { label: "評分 B", value: `${form.social_score_b} / 15` },
+                    { label: "總分", value: `${socialTotal}` },
+                  ]},
+                  { title: "心理資本", content: [
+                    { label: "評分 A", value: `${form.psych_score_a} / 15` },
+                    { label: "評分 B", value: `${form.psych_score_b} / 10` },
+                    { label: "總分", value: `${psychTotal}` },
+                  ]},
+                  { title: "人生資本總分", content: `${grandTotal}` },
                 ],
               })
             }

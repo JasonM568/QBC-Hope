@@ -9,17 +9,66 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { exportPDF } from "@/lib/export-pdf";
 
+function Checkbox({ checked, onChange, label }: {
+  checked: boolean; onChange: (v: boolean) => void; label: string;
+}) {
+  return (
+    <label className="flex items-center gap-2 cursor-pointer select-none">
+      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="w-4 h-4 rounded border-border accent-gold" />
+      <span className="text-sm">{label}</span>
+    </label>
+  );
+}
+
+function PartHeader({ num, title }: { num: number; title: string }) {
+  return (
+    <div className="flex items-center gap-2 mb-4">
+      <span className="w-7 h-7 rounded-full bg-gold/20 text-gold text-sm font-bold flex items-center justify-center">{num}</span>
+      <h2 className="font-semibold text-lg">PART {num} {title}</h2>
+    </div>
+  );
+}
+
+interface StrategyForm {
+  core_ability: string;
+  success_experience: string;
+  unique_ability: string;
+  resource_tech: boolean;
+  resource_network: boolean;
+  resource_fund: boolean;
+  resource_brand: boolean;
+  resource_experience: boolean;
+  current_field: string;
+  target_market: string;
+  focused_battlefield: string;
+  market_trend: string;
+  three_year_opportunity: string;
+  ai_tech_dividend: string;
+  who_am_i: string;
+  who_to_help: string;
+  what_problem: string;
+  positioning_statement: string;
+}
+
+const emptyForm: StrategyForm = {
+  core_ability: "", success_experience: "", unique_ability: "",
+  resource_tech: false, resource_network: false, resource_fund: false, resource_brand: false, resource_experience: false,
+  current_field: "", target_market: "", focused_battlefield: "",
+  market_trend: "", three_year_opportunity: "", ai_tech_dividend: "",
+  who_am_i: "", who_to_help: "", what_problem: "", positioning_statement: "",
+};
+
 export default function StrategyPage() {
-  const [strengths, setStrengths] = useState("");
-  const [battlefield, setBattlefield] = useState("");
-  const [positioning, setPositioning] = useState("");
-  const [actionPlan, setActionPlan] = useState("");
+  const [form, setForm] = useState<StrategyForm>(emptyForm);
   const [userName, setUserName] = useState("");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
-  const [history, setHistory] = useState<Array<{ id: string; created_at: string; strengths: string; positioning: string }>>([]);
+  const [history, setHistory] = useState<Array<{ id: string; created_at: string; positioning_statement: string }>>([]);
   const router = useRouter();
+
+  const set = <K extends keyof StrategyForm>(key: K, value: StrategyForm[K]) =>
+    setForm((prev) => ({ ...prev, [key]: value }));
 
   useEffect(() => {
     async function load() {
@@ -28,7 +77,6 @@ export default function StrategyPage() {
       if (!user) { router.push("/auth/login"); return; }
       setUserName(user.user_metadata?.display_name || user.email || "");
 
-      // Load latest entry
       const { data } = await supabase
         .from("strategic_positions")
         .select("*")
@@ -38,10 +86,7 @@ export default function StrategyPage() {
 
       if (data && data.length > 0) {
         const latest = data[0];
-        setStrengths(latest.strengths || "");
-        setBattlefield(latest.battlefield || "");
-        setPositioning(latest.positioning || "");
-        setActionPlan(latest.action_plan || "");
+        setForm({ ...emptyForm, ...latest });
         setHistory(data);
       }
       setLoading(false);
@@ -53,17 +98,13 @@ export default function StrategyPage() {
     e.preventDefault();
     setSaving(true);
     setMessage("");
-
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
     const { error } = await supabase.from("strategic_positions").insert({
       user_id: user.id,
-      strengths,
-      battlefield,
-      positioning,
-      action_plan: actionPlan,
+      ...form,
     });
 
     if (error) {
@@ -91,74 +132,112 @@ export default function StrategyPage() {
       <main className="max-w-2xl mx-auto px-4 py-8">
         <div className="mb-6">
           <h1 className="text-2xl font-bold">個人戰略定位工具</h1>
-          <p className="text-muted-foreground mt-1">找到你的優勢、選定戰場、明確定位</p>
+          <p className="text-muted-foreground mt-1">Personal Strategic Positioning Tools</p>
+          <p className="text-gold mt-2 font-medium">核心原則：成功不是更努力，而是選對戰場。</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="p-6 rounded-xl border border-border bg-card">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="w-7 h-7 rounded-full bg-gold/20 text-gold text-sm font-bold flex items-center justify-center">1</span>
-              <h2 className="font-semibold">我的優勢</h2>
+          {/* PART 1 優勢分析 */}
+          <div className="p-6 rounded-xl border border-border bg-card space-y-4">
+            <PartHeader num={1} title="優勢分析" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label>我的核心能力</Label>
+                <Textarea value={form.core_ability} onChange={(e) => set("core_ability", e.target.value)} rows={3} className="mt-1 bg-background border-border" />
+              </div>
+              <div>
+                <Label>我的過去成功經驗</Label>
+                <Textarea value={form.success_experience} onChange={(e) => set("success_experience", e.target.value)} rows={3} className="mt-1 bg-background border-border" />
+              </div>
             </div>
-            <Label>你最擅長什麼？別人最常稱讚你的是？</Label>
-            <Textarea
-              value={strengths}
-              onChange={(e) => setStrengths(e.target.value)}
-              placeholder="列出你的核心優勢、天賦、技能..."
-              rows={5}
-              className="mt-2 bg-background border-border"
-            />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label>別人做不到，但我可以做到的是</Label>
+                <Textarea value={form.unique_ability} onChange={(e) => set("unique_ability", e.target.value)} rows={3} className="mt-1 bg-background border-border" />
+              </div>
+              <div>
+                <Label className="mb-2 block">我的資源</Label>
+                <div className="space-y-2">
+                  <Checkbox checked={form.resource_tech} onChange={(v) => set("resource_tech", v)} label="技術" />
+                  <Checkbox checked={form.resource_network} onChange={(v) => set("resource_network", v)} label="人脈" />
+                  <Checkbox checked={form.resource_fund} onChange={(v) => set("resource_fund", v)} label="資金" />
+                  <Checkbox checked={form.resource_brand} onChange={(v) => set("resource_brand", v)} label="品牌" />
+                  <Checkbox checked={form.resource_experience} onChange={(v) => set("resource_experience", v)} label="經驗" />
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div className="p-6 rounded-xl border border-border bg-card">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="w-7 h-7 rounded-full bg-gold/20 text-gold text-sm font-bold flex items-center justify-center">2</span>
-              <h2 className="font-semibold">選定戰場</h2>
+          {/* PART 2 戰場選擇 */}
+          <div className="p-6 rounded-xl border border-border bg-card space-y-4">
+            <PartHeader num={2} title="戰場選擇" />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <Label>我目前所在領域</Label>
+                <Textarea value={form.current_field} onChange={(e) => set("current_field", e.target.value)} rows={4} className="mt-1 bg-background border-border" />
+              </div>
+              <div>
+                <Label>我可以切入的市場</Label>
+                <Textarea value={form.target_market} onChange={(e) => set("target_market", e.target.value)} rows={4} className="mt-1 bg-background border-border" />
+              </div>
+              <div>
+                <Label>我選擇的戰場（聚焦）</Label>
+                <Textarea value={form.focused_battlefield} onChange={(e) => set("focused_battlefield", e.target.value)} rows={4} className="mt-1 bg-background border-border" />
+              </div>
             </div>
-            <Label>你要在哪個領域發揮？市場在哪裡？</Label>
-            <Textarea
-              value={battlefield}
-              onChange={(e) => setBattlefield(e.target.value)}
-              placeholder="你選擇深耕的產業、領域、市場..."
-              rows={5}
-              className="mt-2 bg-background border-border"
-            />
           </div>
 
-          <div className="p-6 rounded-xl border border-border bg-card">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="w-7 h-7 rounded-full bg-gold/20 text-gold text-sm font-bold flex items-center justify-center">3</span>
-              <h2 className="font-semibold">明確定位</h2>
+          {/* PART 3 機會判斷 */}
+          <div className="p-6 rounded-xl border border-border bg-card space-y-4">
+            <PartHeader num={3} title="機會判斷" />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <Label>市場趨勢是什麼</Label>
+                <Textarea value={form.market_trend} onChange={(e) => set("market_trend", e.target.value)} rows={4} className="mt-1 bg-background border-border" />
+              </div>
+              <div>
+                <Label>未來3年機會是什麼</Label>
+                <Textarea value={form.three_year_opportunity} onChange={(e) => set("three_year_opportunity", e.target.value)} rows={4} className="mt-1 bg-background border-border" />
+              </div>
+              <div>
+                <Label>AI / 技術 / 時代紅利</Label>
+                <Textarea value={form.ai_tech_dividend} onChange={(e) => set("ai_tech_dividend", e.target.value)} rows={4} className="mt-1 bg-background border-border" />
+              </div>
             </div>
-            <Label>一句話說明你是誰、你為誰解決什麼問題？</Label>
-            <Textarea
-              value={positioning}
-              onChange={(e) => setPositioning(e.target.value)}
-              placeholder="我是＿＿，我幫助＿＿透過＿＿達成＿＿"
-              rows={4}
-              className="mt-2 bg-background border-border"
-            />
           </div>
 
-          <div className="p-6 rounded-xl border border-border bg-card">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="w-7 h-7 rounded-full bg-gold/20 text-gold text-sm font-bold flex items-center justify-center">4</span>
-              <h2 className="font-semibold">行動計畫</h2>
+          {/* PART 4 個人定位一句話 */}
+          <div className="p-6 rounded-xl border border-gold/30 bg-card space-y-4">
+            <PartHeader num={4} title="個人定位一句話" />
+            <p className="text-sm text-gold mb-2">我是誰 + 幫誰 + 解決什麼問題</p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <Label>我是誰</Label>
+                <Textarea value={form.who_am_i} onChange={(e) => set("who_am_i", e.target.value)} rows={3} className="mt-1 bg-background border-border" />
+              </div>
+              <div>
+                <Label>我可以幫助誰</Label>
+                <Textarea value={form.who_to_help} onChange={(e) => set("who_to_help", e.target.value)} rows={3} className="mt-1 bg-background border-border" />
+              </div>
+              <div>
+                <Label>我能解決什麼問題</Label>
+                <Textarea value={form.what_problem} onChange={(e) => set("what_problem", e.target.value)} rows={3} className="mt-1 bg-background border-border" />
+              </div>
             </div>
-            <Label>接下來 90 天，你要做哪些關鍵行動？</Label>
-            <Textarea
-              value={actionPlan}
-              onChange={(e) => setActionPlan(e.target.value)}
-              placeholder="列出 3-5 個具體可執行的行動..."
-              rows={5}
-              className="mt-2 bg-background border-border"
-            />
+            <div>
+              <Label className="text-gold font-semibold">個人定位一句話</Label>
+              <Textarea
+                value={form.positioning_statement}
+                onChange={(e) => set("positioning_statement", e.target.value)}
+                placeholder="我是＿＿，我幫助＿＿，解決＿＿問題"
+                rows={2}
+                className="mt-1 bg-background border-gold/30"
+              />
+            </div>
           </div>
 
           {message && (
-            <p className={`text-sm ${message.includes("失敗") ? "text-red-400" : "text-green-400"}`}>
-              {message}
-            </p>
+            <p className={`text-sm ${message.includes("失敗") ? "text-red-400" : "text-green-400"}`}>{message}</p>
           )}
 
           <Button type="submit" disabled={saving} className="w-full bg-gold text-black hover:bg-gold-light font-semibold h-12">
@@ -173,10 +252,22 @@ export default function StrategyPage() {
                 date: new Date().toISOString().split("T")[0],
                 userName,
                 sections: [
-                  { title: "我的優勢", content: strengths },
-                  { title: "選定戰場", content: battlefield },
-                  { title: "明確定位", content: positioning },
-                  { title: "行動計畫", content: actionPlan },
+                  { title: "PART 1：優勢分析", content: [
+                    { label: "核心能力", value: form.core_ability },
+                    { label: "成功經驗", value: form.success_experience },
+                    { label: "獨特能力", value: form.unique_ability },
+                  ]},
+                  { title: "PART 2：戰場選擇", content: [
+                    { label: "目前領域", value: form.current_field },
+                    { label: "切入市場", value: form.target_market },
+                    { label: "聚焦戰場", value: form.focused_battlefield },
+                  ]},
+                  { title: "PART 3：機會判斷", content: [
+                    { label: "市場趨勢", value: form.market_trend },
+                    { label: "3年機會", value: form.three_year_opportunity },
+                    { label: "AI/技術紅利", value: form.ai_tech_dividend },
+                  ]},
+                  { title: "PART 4：個人定位一句話", content: form.positioning_statement },
                 ],
               })
             }
@@ -187,7 +278,6 @@ export default function StrategyPage() {
           </Button>
         </form>
 
-        {/* History */}
         {history.length > 1 && (
           <div className="mt-10">
             <h2 className="text-lg font-semibold mb-4">歷史紀錄</h2>
@@ -197,7 +287,7 @@ export default function StrategyPage() {
                   <p className="text-xs text-muted-foreground mb-1">
                     {new Date(h.created_at).toLocaleDateString("zh-TW")}
                   </p>
-                  <p className="text-sm text-foreground/80">{h.positioning || h.strengths?.slice(0, 100)}</p>
+                  <p className="text-sm text-foreground/80">{h.positioning_statement || "（未填寫定位）"}</p>
                 </div>
               ))}
             </div>
