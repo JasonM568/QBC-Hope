@@ -129,6 +129,11 @@ export default function RegisterPage() {
             前往登入
           </Link>
         </p>
+        <p className="text-center mt-3">
+          <Link href="/" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+            &larr; 返回首頁
+          </Link>
+        </p>
       </div>
     </div>
   );
