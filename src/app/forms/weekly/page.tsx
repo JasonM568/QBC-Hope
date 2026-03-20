@@ -1,0 +1,253 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
+import Navbar from "@/components/layout/navbar";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { exportPDF } from "@/lib/export-pdf";
+
+function getWeekNumber(d: Date): number {
+  const start = new Date(d.getFullYear(), 0, 1);
+  const diff = d.getTime() - start.getTime();
+  return Math.ceil((diff / 86400000 + start.getDay() + 1) / 7);
+}
+
+export default function WeeklyAltruismPage() {
+  const now = new Date();
+  const [year] = useState(now.getFullYear());
+  const [weekNumber] = useState(getWeekNumber(now));
+  const [sharesCount, setSharesCount] = useState(0);
+  const [helpsCount, setHelpsCount] = useState(0);
+  const [referralsCount, setReferralsCount] = useState(0);
+  const [sharesDetail, setSharesDetail] = useState("");
+  const [helpsDetail, setHelpsDetail] = useState("");
+  const [referralsDetail, setReferralsDetail] = useState("");
+  const [reflection, setReflection] = useState("");
+  const [userName, setUserName] = useState("");
+  const [existing, setExisting] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(true);
+  const router = useRouter();
+
+  useEffect(() => {
+    async function load() {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { router.push("/auth/login"); return; }
+      setUserName(user.user_metadata?.display_name || user.email || "");
+
+      const { data } = await supabase
+        .from("weekly_altruism")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("year", year)
+        .eq("week_number", weekNumber)
+        .single();
+
+      if (data) {
+        setSharesCount(data.shares_count || 0);
+        setHelpsCount(data.helps_count || 0);
+        setReferralsCount(data.referrals_count || 0);
+        setSharesDetail(data.shares_detail || "");
+        setHelpsDetail(data.helps_detail || "");
+        setReferralsDetail(data.referrals_detail || "");
+        setReflection(data.reflection || "");
+        setExisting(true);
+      }
+      setLoading(false);
+    }
+    load();
+  }, [router, year, weekNumber]);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    setMessage("");
+
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const payload = {
+      user_id: user.id,
+      year, week_number: weekNumber,
+      shares_count: sharesCount, shares_detail: sharesDetail,
+      helps_count: helpsCount, helps_detail: helpsDetail,
+      referrals_count: referralsCount, referrals_detail: referralsDetail,
+      reflection,
+    };
+
+    const { error } = existing
+      ? await supabase.from("weekly_altruism").update(payload).eq("user_id", user.id).eq("year", year).eq("week_number", weekNumber)
+      : await supabase.from("weekly_altruism").insert(payload);
+
+    if (error) {
+      setMessage("儲存失敗：" + error.message);
+    } else {
+      setMessage("週報已儲存！");
+      setExisting(true);
+    }
+    setSaving(false);
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen">
+        <Navbar userName={userName} />
+        <div className="flex items-center justify-center h-[60vh]">
+          <p className="text-muted-foreground">載入中...</p>
+        </div>
+      </div>
+    );
+  }
+
+  const totalImpact = sharesCount + helpsCount + referralsCount;
+
+  return (
+    <div className="min-h-screen">
+      <Navbar userName={userName} />
+      <main className="max-w-2xl mx-auto px-4 py-8">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold">利他影響力週報</h1>
+          <p className="text-muted-foreground mt-1">{year} 年 第 {weekNumber} 週</p>
+          {existing && (
+            <span className="inline-block mt-2 px-3 py-1 bg-green-400/10 text-green-400 text-sm rounded-full">
+              本週已填寫（可更新）
+            </span>
+          )}
+        </div>
+
+        {/* Impact Summary */}
+        <div className="p-6 rounded-xl border border-gold/30 bg-card mb-6">
+          <p className="text-muted-foreground text-sm">本週利他影響力</p>
+          <p className="text-4xl font-bold text-gold mt-1">{totalImpact} 次</p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Shares */}
+          <div className="p-6 rounded-xl border border-border bg-card">
+            <h2 className="font-semibold text-gold mb-4">分享 (Share)</h2>
+            <div className="flex items-center gap-4 mb-4">
+              <Label className="shrink-0">次數</Label>
+              <Input
+                type="number" min={0}
+                value={sharesCount}
+                onChange={(e) => setSharesCount(parseInt(e.target.value) || 0)}
+                className="w-24 bg-background border-border"
+              />
+            </div>
+            <Label>分享了什麼？</Label>
+            <Textarea
+              value={sharesDetail}
+              onChange={(e) => setSharesDetail(e.target.value)}
+              placeholder="分享的知識、經驗或資源..."
+              rows={3}
+              className="mt-2 bg-background border-border"
+            />
+          </div>
+
+          {/* Helps */}
+          <div className="p-6 rounded-xl border border-border bg-card">
+            <h2 className="font-semibold text-gold mb-4">幫助 (Help)</h2>
+            <div className="flex items-center gap-4 mb-4">
+              <Label className="shrink-0">次數</Label>
+              <Input
+                type="number" min={0}
+                value={helpsCount}
+                onChange={(e) => setHelpsCount(parseInt(e.target.value) || 0)}
+                className="w-24 bg-background border-border"
+              />
+            </div>
+            <Label>幫助了誰？</Label>
+            <Textarea
+              value={helpsDetail}
+              onChange={(e) => setHelpsDetail(e.target.value)}
+              placeholder="具體幫助的人與事..."
+              rows={3}
+              className="mt-2 bg-background border-border"
+            />
+          </div>
+
+          {/* Referrals */}
+          <div className="p-6 rounded-xl border border-border bg-card">
+            <h2 className="font-semibold text-gold mb-4">引薦 (Refer)</h2>
+            <div className="flex items-center gap-4 mb-4">
+              <Label className="shrink-0">次數</Label>
+              <Input
+                type="number" min={0}
+                value={referralsCount}
+                onChange={(e) => setReferralsCount(parseInt(e.target.value) || 0)}
+                className="w-24 bg-background border-border"
+              />
+            </div>
+            <Label>引薦了誰給誰？</Label>
+            <Textarea
+              value={referralsDetail}
+              onChange={(e) => setReferralsDetail(e.target.value)}
+              placeholder="引薦的人脈連結..."
+              rows={3}
+              className="mt-2 bg-background border-border"
+            />
+          </div>
+
+          <div className="p-6 rounded-xl border border-border bg-card">
+            <Label>本週反思</Label>
+            <Textarea
+              value={reflection}
+              onChange={(e) => setReflection(e.target.value)}
+              placeholder="利他帶給你什麼感受與收穫？"
+              rows={4}
+              className="mt-2 bg-background border-border"
+            />
+          </div>
+
+          {message && (
+            <p className={`text-sm ${message.includes("失敗") ? "text-red-400" : "text-green-400"}`}>
+              {message}
+            </p>
+          )}
+
+          <Button type="submit" disabled={saving} className="w-full bg-gold text-black hover:bg-gold-light font-semibold h-12">
+            {saving ? "儲存中..." : existing ? "更新週報" : "提交週報"}
+          </Button>
+
+          <Button
+            type="button"
+            onClick={() =>
+              exportPDF({
+                reportTitle: "利他影響力週報",
+                subtitle: `${year} 年 第 ${weekNumber} 週`,
+                date: `${year}-W${weekNumber}`,
+                userName,
+                sections: [
+                  {
+                    title: "影響力總覽",
+                    content: [
+                      { label: "分享次數", value: `${sharesCount} 次` },
+                      { label: "幫助次數", value: `${helpsCount} 次` },
+                      { label: "引薦次數", value: `${referralsCount} 次` },
+                      { label: "總計", value: `${sharesCount + helpsCount + referralsCount} 次` },
+                    ],
+                  },
+                  { title: "分享內容", content: sharesDetail },
+                  { title: "幫助紀錄", content: helpsDetail },
+                  { title: "引薦紀錄", content: referralsDetail },
+                  { title: "本週反思", content: reflection },
+                ],
+              })
+            }
+            variant="outline"
+            className="w-full border-gold/30 text-gold hover:bg-gold/10 h-12"
+          >
+            匯出 PDF
+          </Button>
+        </form>
+      </main>
+    </div>
+  );
+}
