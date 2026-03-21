@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 
 interface CheckItem {
@@ -44,6 +44,26 @@ export default function ReportPreview({
   const [open, setOpen] = useState(false);
   const previewRef = useRef<HTMLDivElement>(null);
 
+  // 打開時鎖定背景滾動
+  useEffect(() => {
+    if (open) {
+      const scrollY = window.scrollY;
+      document.body.style.position = "fixed";
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.left = "0";
+      document.body.style.right = "0";
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.position = "";
+        document.body.style.top = "";
+        document.body.style.left = "";
+        document.body.style.right = "";
+        document.body.style.overflow = "";
+        window.scrollTo(0, scrollY);
+      };
+    }
+  }, [open]);
+
   if (!open) {
     return (
       <div className="flex gap-3">
@@ -69,9 +89,12 @@ export default function ReportPreview({
   }
 
   return (
-    <div className="fixed inset-0 z-[100] flex flex-col bg-black/80 backdrop-blur-sm">
+    <div
+      className="fixed inset-0 z-[100] flex flex-col bg-black/80 backdrop-blur-sm"
+      style={{ touchAction: "none" }}
+    >
       {/* 操作列 */}
-      <div className="flex items-center justify-between px-4 py-3 bg-card border-b border-border">
+      <div className="flex items-center justify-between px-4 py-3 bg-card border-b border-border shrink-0">
         <p className="text-sm text-muted-foreground">截圖此畫面即可分享到群組</p>
         <div className="flex gap-2">
           {onExportPDF && (
@@ -96,11 +119,13 @@ export default function ReportPreview({
       </div>
 
       {/* 預覽內容 - 可滾動 */}
-      <div className="flex-1 overflow-auto p-4 flex justify-center">
+      <div
+        className="flex-1 overflow-y-auto p-4 flex justify-center"
+        style={{ WebkitOverflowScrolling: "touch", overscrollBehavior: "contain", touchAction: "pan-y" }}
+      >
         <div
           ref={previewRef}
-          className="w-full max-w-2xl bg-[#0A0A0A] rounded-xl border border-border overflow-hidden"
-          style={{ maxHeight: "fit-content" }}
+          className="w-full max-w-2xl bg-[#0A0A0A] rounded-xl border border-border overflow-hidden h-fit"
         >
           {/* 標題列 */}
           <div className="bg-[#111] px-5 py-4 border-b border-gold/30">
