@@ -137,8 +137,8 @@ export default function ReportPreview({
                 )}
               </div>
               <div className="text-right">
-                <p className="text-xs text-muted-foreground">{userName}</p>
-                <p className="text-xs text-muted-foreground">{date}</p>
+                <p className="text-base font-semibold text-foreground">{userName}</p>
+                <p className="text-sm text-muted-foreground">{date}</p>
               </div>
             </div>
           </div>
