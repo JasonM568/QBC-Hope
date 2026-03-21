@@ -619,86 +619,76 @@ export default function DailyReportPage() {
               subtitle={`Day ${report.day_number}${planRound > 1 ? ` (第${planRound}輪)` : ""}`}
               date={today}
               userName={userName}
+              gridLayout
               sections={[
-                {
+                /* 左1 */ {
                   title: "基本資訊",
                   items: [
                     { label: "能量狀態", value: `${report.energy_state} / 10` },
-                    { label: "今天最重要的一件事", value: report.most_important_thing },
+                    { label: "最重要的事", value: report.most_important_thing },
                   ],
                 },
-                {
-                  title: "",
-                  columns: [
-                    {
-                      title: "PART 1 晨間信念打卡",
-                      checks: [
-                        { label: "四大信念", checked: report.belief_four_beliefs },
-                        { label: "找到方法，看見希望", checked: report.belief_find_hope },
-                        { label: "認知決定人生", checked: report.belief_cognition },
-                        { label: "每天升級自己", checked: report.belief_upgrade },
-                        { label: "願意照亮他人", checked: report.belief_shine },
-                      ],
-                      items: [{ label: "自我宣言", value: report.self_declaration }],
-                    },
-                    {
-                      title: "PART 2 今日覺察",
-                      items: [
-                        { label: "可以更好的地方", value: report.awareness_improve },
-                        { label: "覺察到什麼", value: report.awareness_notice },
-                      ],
-                    },
+                /* 右1 */ {
+                  title: "1 晨間信念打卡",
+                  checks: [
+                    { label: "四大信念", checked: report.belief_four_beliefs },
+                    { label: "看見希望", checked: report.belief_find_hope },
+                    { label: "認知決定", checked: report.belief_cognition },
+                    { label: "升級自己", checked: report.belief_upgrade },
+                    { label: "照亮他人", checked: report.belief_shine },
+                  ],
+                  items: [{ label: "自我宣言", value: report.self_declaration }],
+                },
+                /* 左2 */ {
+                  title: "2 今日覺察",
+                  items: [
+                    { label: "可以更好的地方", value: report.awareness_improve },
+                    { label: "覺察到什麼", value: report.awareness_notice },
                   ],
                 },
-                {
-                  title: "",
-                  columns: [
-                    {
-                      title: "PART 3 今日學習",
-                      items: [{ label: "學到什麼", value: report.learning_content }],
-                      checks: [
-                        { label: "課程", checked: report.learning_course },
-                        { label: "書籍", checked: report.learning_book },
-                        { label: "對話", checked: report.learning_dialogue },
-                        { label: "觀察", checked: report.learning_observation },
-                        { label: "其他", checked: report.learning_other },
-                      ],
-                    },
-                    {
-                      title: "PART 4 今日行動",
-                      items: [{ label: "做了什麼", value: report.action_content }],
-                      checks: [
-                        { label: "事業", checked: report.action_career },
-                        { label: "財富", checked: report.action_wealth },
-                        { label: "健康", checked: report.action_health },
-                        { label: "家庭", checked: report.action_family },
-                        { label: "關係", checked: report.action_relationship },
-                      ],
-                    },
+                /* 右2 */ {
+                  title: "3 今日學習",
+                  items: [{ label: "學到什麼", value: report.learning_content }],
+                  checks: [
+                    { label: "課程", checked: report.learning_course },
+                    { label: "書籍", checked: report.learning_book },
+                    { label: "對話", checked: report.learning_dialogue },
+                    { label: "觀察", checked: report.learning_observation },
+                    { label: "其他", checked: report.learning_other },
                   ],
                 },
-                {
-                  title: "",
-                  columns: [
-                    { title: "PART 5 今日分享", content: report.sharing_content },
-                    { title: "PART 6 感恩時刻", content: report.gratitude },
+                /* 左3 */ {
+                  title: "4 今日行動",
+                  items: [{ label: "做了什麼", value: report.action_content }],
+                  checks: [
+                    { label: "事業", checked: report.action_career },
+                    { label: "財富", checked: report.action_wealth },
+                    { label: "健康", checked: report.action_health },
+                    { label: "家庭", checked: report.action_family },
+                    { label: "關係", checked: report.action_relationship },
                   ],
                 },
-                {
-                  title: "",
-                  columns: [
-                    {
-                      title: "PART 7 今日評分",
-                      items: [
-                        { label: "給分", value: `${report.daily_score} / 10` },
-                        { label: "比昨天", value: report.compare_yesterday === "better" ? "好" : report.compare_yesterday === "worse" ? "差" : "—" },
-                        { label: "自評", value: report.score_note },
-                      ],
-                    },
-                    { title: "PART 8 明日行動", content: report.tomorrow_action },
+                /* 右3 */ {
+                  title: "5 今日分享",
+                  content: report.sharing_content,
+                },
+                /* 左4 */ {
+                  title: "6 感恩時刻",
+                  content: report.gratitude,
+                },
+                /* 右4 */ {
+                  title: "7 今日評分",
+                  items: [
+                    { label: "給分", value: `${report.daily_score} / 10` },
+                    { label: "比昨天", value: report.compare_yesterday === "better" ? "好" : report.compare_yesterday === "worse" ? "差" : "—" },
+                    { label: "自評", value: report.score_note },
                   ],
                 },
-                {
+                /* 左5 */ {
+                  title: "8 明日行動",
+                  content: report.tomorrow_action,
+                },
+                /* 右5 */ {
                   title: "群組公佈",
                   checks: [{ label: "已在群裡完成公佈", checked: report.announced_in_group }],
                 },

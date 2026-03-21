@@ -23,6 +23,7 @@ interface ReportPreviewProps {
   date: string;
   userName: string;
   sections: PreviewSection[];
+  gridLayout?: boolean; // 2×5 格狀排版（日報表用）
   onExportPDF?: () => void;
 }
 
@@ -32,6 +33,7 @@ export default function ReportPreview({
   date,
   userName,
   sections,
+  gridLayout,
   onExportPDF,
 }: ReportPreviewProps) {
   const [open, setOpen] = useState(false);
@@ -60,12 +62,13 @@ export default function ReportPreview({
     }
   }, [open]);
 
+  const renderWidth = gridLayout ? 750 : 720;
+
   const generateImage = useCallback(async () => {
     if (!renderRef.current) return;
     setGenerating(true);
     setOpen(true);
 
-    // 等 DOM 渲染完
     await new Promise((r) => setTimeout(r, 100));
 
     try {
@@ -78,7 +81,6 @@ export default function ReportPreview({
       const dataUrl = canvas.toDataURL("image/png");
       setImageUrl(dataUrl);
 
-      // 轉成 Blob URL，iOS Safari 才能長按儲存
       canvas.toBlob((blob) => {
         if (blob) {
           const objUrl = URL.createObjectURL(blob);
@@ -102,7 +104,6 @@ export default function ReportPreview({
 
   async function handleDownload() {
     if (!imageUrl) return;
-    // 嘗試用 Web Share API（手機最可靠）
     if (blobUrl && navigator.share) {
       try {
         const res = await fetch(blobUrl);
@@ -111,7 +112,7 @@ export default function ReportPreview({
         await navigator.share({ files: [file] });
         return;
       } catch {
-        // 使用者取消或不支援，fallback 到下載
+        // fallback
       }
     }
     const link = document.createElement("a");
@@ -144,51 +145,72 @@ export default function ReportPreview({
         )}
       </div>
 
-      {/* 隱藏的 HTML 渲染區（固定 720px 寬度產生清晰圖片） */}
+      {/* 隱藏的 HTML 渲染區 */}
       <div
-        style={{ position: "fixed", left: "-9999px", top: 0, width: 720 }}
+        style={{ position: "fixed", left: "-9999px", top: 0, width: renderWidth }}
         aria-hidden
       >
-        <div ref={renderRef} style={{ width: 720, background: "#0A0A0A", padding: 0 }}>
+        <div ref={renderRef} style={{ width: renderWidth, background: "#0A0A0A", padding: 0 }}>
           {/* 標題列 */}
-          <div style={{ background: "#111", padding: "20px 24px", borderBottom: "2px solid #D4AF37" }}>
+          <div style={{
+            background: "#111",
+            padding: gridLayout ? "16px 20px" : "20px 24px",
+            borderBottom: "2px solid #D4AF37",
+          }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
               <div>
-                <div style={{ fontSize: 22, fontWeight: 700, color: "#D4AF37" }}>{reportTitle}</div>
+                <div style={{ fontSize: gridLayout ? 28 : 22, fontWeight: 700, color: "#D4AF37" }}>{reportTitle}</div>
                 {subtitle && (
-                  <div style={{ fontSize: 18, color: "#D4AF37B3", marginTop: 4 }}>{subtitle}</div>
+                  <div style={{ fontSize: gridLayout ? 22 : 18, color: "#D4AF37B3", marginTop: 2 }}>{subtitle}</div>
                 )}
               </div>
               <div style={{ textAlign: "right" }}>
-                <div style={{ fontSize: 18, fontWeight: 600, color: "#EDEDEF" }}>{userName}</div>
-                <div style={{ fontSize: 16, color: "#A1A1AA", marginTop: 2 }}>{date}</div>
+                <div style={{ fontSize: gridLayout ? 22 : 18, fontWeight: 600, color: "#EDEDEF" }}>{userName}</div>
+                <div style={{ fontSize: gridLayout ? 20 : 16, color: "#A1A1AA", marginTop: 2 }}>{date}</div>
               </div>
             </div>
           </div>
 
           {/* 內容區 */}
-          <div style={{ padding: 16 }}>
-            {sections.map((section, i) => {
-              if (section.columns && section.columns.length === 2) {
+          {gridLayout ? (
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: 8,
+              padding: 10,
+            }}>
+              {sections.map((section, i) => (
+                <GridBlock key={i} section={section} />
+              ))}
+            </div>
+          ) : (
+            <div style={{ padding: 16 }}>
+              {sections.map((section, i) => {
+                if (section.columns && section.columns.length === 2) {
+                  return (
+                    <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+                      {section.columns.map((col, ci) => (
+                        <RenderSection key={ci} section={col} />
+                      ))}
+                    </div>
+                  );
+                }
                 return (
-                  <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
-                    {section.columns.map((col, ci) => (
-                      <RenderSection key={ci} section={col} />
-                    ))}
+                  <div key={i} style={{ marginBottom: 12 }}>
+                    <RenderSection section={section} />
                   </div>
                 );
-              }
-              return (
-                <div key={i} style={{ marginBottom: 12 }}>
-                  <RenderSection section={section} />
-                </div>
-              );
-            })}
-          </div>
+              })}
+            </div>
+          )}
 
           {/* 底部 */}
-          <div style={{ borderTop: "1px solid #27272A", padding: "14px 24px", textAlign: "center" }}>
-            <div style={{ fontSize: 18, fontWeight: 700, color: "#D4AF37" }}>HOPE 人生作業系統</div>
+          <div style={{
+            borderTop: "1px solid #27272A",
+            padding: gridLayout ? "10px 20px" : "14px 24px",
+            textAlign: "center",
+          }}>
+            <div style={{ fontSize: gridLayout ? 22 : 18, fontWeight: 700, color: "#D4AF37" }}>HOPE 人生作業系統</div>
           </div>
         </div>
       </div>
@@ -199,7 +221,6 @@ export default function ReportPreview({
           className="fixed inset-0 z-[100] flex flex-col bg-black/90"
           style={{ touchAction: "none" }}
         >
-          {/* 操作列 */}
           <div className="flex items-center justify-between px-4 py-3 bg-card border-b border-border shrink-0">
             <p className="text-xs text-muted-foreground">長按圖片可儲存</p>
             <div className="flex gap-2">
@@ -232,7 +253,6 @@ export default function ReportPreview({
             </div>
           </div>
 
-          {/* 圖片顯示區 — 支援雙指縮放 */}
           <div
             className="flex-1 overflow-auto flex justify-center items-start p-2"
             style={{
@@ -253,7 +273,7 @@ export default function ReportPreview({
                 alt={reportTitle}
                 style={{
                   width: "100%",
-                  maxWidth: 720,
+                  maxWidth: renderWidth,
                   height: "auto",
                   borderRadius: 8,
                 }}
@@ -266,11 +286,77 @@ export default function ReportPreview({
   );
 }
 
-// 用 inline style 渲染（html2canvas 不支援 Tailwind class）
+// ============================================================
+// gridLayout 專用：大字體緊湊區塊（日報表 2×5 格狀排版）
+// 750px 渲染 → 390px 手機顯示 ≈ 52%
+// 字體 26px 渲染 → 手機上約 13.5px，清晰可讀
+// ============================================================
+function GridBlock({ section }: { section: PreviewSection }) {
+  return (
+    <div style={{ border: "1px solid #27272A80", borderRadius: 8, overflow: "hidden" }}>
+      {/* 標題列 */}
+      {section.title && (
+        <div style={{ background: "#D4AF3718", padding: "6px 10px" }}>
+          <div style={{ fontSize: 22, fontWeight: 700, color: "#D4AF37" }}>{section.title}</div>
+        </div>
+      )}
+
+      <div style={{ padding: "8px 10px" }}>
+        {/* 勾選項 */}
+        {section.checks && section.checks.length > 0 && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "3px 12px", marginBottom: section.items || section.content ? 6 : 0 }}>
+            {section.checks.map((c, i) => (
+              <span key={i} style={{ fontSize: 20, color: c.checked ? "#D4AF37" : "#71717A80" }}>
+                {c.checked ? "✓" : "○"} {c.label}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Key-value 項目 */}
+        {section.items &&
+          section.items.map((item, i) => (
+            <div key={i} style={{ marginBottom: 4 }}>
+              <div style={{ fontSize: 18, color: "#A1A1AA" }}>{item.label}</div>
+              <div style={{
+                fontSize: 22,
+                color: "#EDEDEFE6",
+                whiteSpace: "pre-wrap",
+                overflow: "hidden",
+                display: "-webkit-box",
+                WebkitLineClamp: 3,
+                WebkitBoxOrient: "vertical",
+              }}>
+                {item.value || "—"}
+              </div>
+            </div>
+          ))}
+
+        {/* 純文字 */}
+        {section.content && (
+          <div style={{
+            fontSize: 22,
+            color: "#EDEDEFE6",
+            whiteSpace: "pre-wrap",
+            overflow: "hidden",
+            display: "-webkit-box",
+            WebkitLineClamp: 4,
+            WebkitBoxOrient: "vertical",
+          }}>
+            {section.content}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// 通用排版（其他表單用）
+// ============================================================
 function RenderSection({ section }: { section: PreviewSection }) {
   return (
     <div style={{ border: "1px solid #27272A80", borderRadius: 8, overflow: "hidden" }}>
-      {/* Section 標題 */}
       {section.title && (
         <div style={{ background: "#D4AF3718", padding: "8px 12px" }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: "#D4AF37" }}>{section.title}</div>
@@ -278,7 +364,6 @@ function RenderSection({ section }: { section: PreviewSection }) {
       )}
 
       <div style={{ padding: "10px 12px" }}>
-        {/* 勾選項 */}
         {section.checks && section.checks.length > 0 && (
           <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 16px", marginBottom: section.items || section.content ? 8 : 0 }}>
             {section.checks.map((c, i) => (
@@ -289,7 +374,6 @@ function RenderSection({ section }: { section: PreviewSection }) {
           </div>
         )}
 
-        {/* Key-value 項目 */}
         {section.items &&
           section.items.map((item, i) => (
             <div key={i} style={{ marginBottom: 6 }}>
@@ -300,7 +384,6 @@ function RenderSection({ section }: { section: PreviewSection }) {
             </div>
           ))}
 
-        {/* 純文字 */}
         {section.content && (
           <div style={{ fontSize: 14, color: "#EDEDEFE6", whiteSpace: "pre-wrap" }}>
             {section.content}
