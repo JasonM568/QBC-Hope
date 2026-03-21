@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { exportPDF } from "@/lib/export-pdf";
+import ReportPreview from "@/components/report-preview";
 
 function Checkbox({ checked, onChange, label }: {
   checked: boolean; onChange: (v: boolean) => void; label: string;
@@ -252,12 +253,40 @@ export default function StrategyPage() {
             {saving ? "儲存中..." : "儲存戰略定位"}
           </Button>
 
-          <Button
-            type="button"
-            onClick={() =>
+          <ReportPreview
+            reportTitle="個人戰略定位工具"
+            date={new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" })}
+            userName={userName}
+            sections={[
+              { title: "PART 1 優勢分析", items: [
+                { label: "核心能力", value: form.core_ability },
+                { label: "成功經驗", value: form.success_experience },
+                { label: "獨特能力", value: form.unique_ability },
+              ], checks: [
+                { label: "技術", checked: form.resource_tech },
+                { label: "人脈", checked: form.resource_network },
+                { label: "資金", checked: form.resource_fund },
+                { label: "品牌", checked: form.resource_brand },
+                { label: "經驗", checked: form.resource_experience },
+              ]},
+              { title: "", columns: [
+                { title: "PART 2 戰場選擇", items: [
+                  { label: "目前領域", value: form.current_field },
+                  { label: "切入市場", value: form.target_market },
+                  { label: "聚焦戰場", value: form.focused_battlefield },
+                ]},
+                { title: "PART 3 機會判斷", items: [
+                  { label: "市場趨勢", value: form.market_trend },
+                  { label: "3年機會", value: form.three_year_opportunity },
+                  { label: "AI/技術紅利", value: form.ai_tech_dividend },
+                ]},
+              ]},
+              { title: "PART 4 個人定位一句話", content: form.positioning_statement },
+            ]}
+            onExportPDF={() =>
               exportPDF({
                 reportTitle: "個人戰略定位工具",
-                date: new Date().toISOString().split("T")[0],
+                date: new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" }),
                 userName,
                 sections: [
                   { title: "PART 1：優勢分析", content: [
@@ -279,11 +308,7 @@ export default function StrategyPage() {
                 ],
               })
             }
-            variant="outline"
-            className="w-full border-gold/30 text-gold hover:bg-gold/10 h-12"
-          >
-            匯出 PDF
-          </Button>
+          />
         </form>
 
         {history.length > 1 && (

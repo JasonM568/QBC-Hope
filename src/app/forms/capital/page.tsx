@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { exportPDF } from "@/lib/export-pdf";
+import ReportPreview from "@/components/report-preview";
 
 function Checkbox({ checked, onChange, label, disabled }: {
   checked: boolean; onChange: (v: boolean) => void; label: string; disabled?: boolean;
@@ -451,12 +452,42 @@ export default function CapitalInventoryPage() {
             {saving ? "儲存中..." : "儲存盤點"}
           </Button>
 
-          <Button
-            type="button"
-            onClick={() =>
+          <ReportPreview
+            reportTitle="人生資本盤點表"
+            date={new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" })}
+            userName={userName}
+            sections={[
+              { title: "", columns: [
+                { title: "經濟資本", items: [
+                  { label: "評分 A", value: `${form.eco_score_a} / 10` },
+                  { label: "評分 B", value: `${form.eco_score_b} / 15` },
+                  { label: "總分", value: `${ecoTotal}` },
+                ]},
+                { title: "智識資本", items: [
+                  { label: "評分 A", value: `${form.know_score_a} / 10` },
+                  { label: "評分 B", value: `${form.know_score_b} / 15` },
+                  { label: "總分", value: `${knowTotal}` },
+                ]},
+              ]},
+              { title: "", columns: [
+                { title: "社會資本", items: [
+                  { label: "評分 A", value: `${form.social_score_a} / 10` },
+                  { label: "評分 B", value: `${form.social_score_b} / 15` },
+                  { label: "總分", value: `${socialTotal}` },
+                ]},
+                { title: "心理資本", items: [
+                  { label: "評分 A", value: `${form.psych_score_a} / 15` },
+                  { label: "評分 B", value: `${form.psych_score_b} / 10` },
+                  { label: "總分", value: `${psychTotal}` },
+                ]},
+              ]},
+              { title: "人生資本總分", content: `${grandTotal} 分` },
+              { title: "總體評價", content: form.overall_evaluation === "beginner" ? "初階成長期" : form.overall_evaluation === "stable" ? "穩定成長期" : form.overall_evaluation === "fast" ? "高速發展期" : "成熟階段" },
+            ]}
+            onExportPDF={() =>
               exportPDF({
                 reportTitle: "人生資本盤點表",
-                date: new Date().toISOString().split("T")[0],
+                date: new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" }),
                 userName,
                 sections: [
                   { title: "經濟資本", content: [
@@ -483,11 +514,7 @@ export default function CapitalInventoryPage() {
                 ],
               })
             }
-            variant="outline"
-            className="w-full border-gold/30 text-gold hover:bg-gold/10 h-12"
-          >
-            匯出 PDF
-          </Button>
+          />
         </form>
       </main>
     </div>

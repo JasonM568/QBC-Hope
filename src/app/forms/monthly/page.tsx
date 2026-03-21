@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { exportPDF } from "@/lib/export-pdf";
+import ReportPreview from "@/components/report-preview";
 
 function Radio({ name, value, checked, onChange, label }: {
   name: string; value: string; checked: boolean; onChange: (v: string) => void; label: string;
@@ -514,9 +515,53 @@ export default function MonthlyReportPage() {
             {saving ? "儲存中..." : existing ? "更新月報" : "提交月報"}
           </Button>
 
-          <Button
-            type="button"
-            onClick={() =>
+          <ReportPreview
+            reportTitle="人生五域平衡月報告"
+            subtitle={`${year} 年 ${month} 月`}
+            date={`${year}-${String(month).padStart(2, "0")}`}
+            userName={userName}
+            sections={[
+              { title: "五域分數總覽", items: [
+                { label: "事業 Career", value: `${form.career_score} / 20` },
+                { label: "財富 Wealth", value: `${form.wealth_score} / 20` },
+                { label: "健康 Health", value: `${form.health_score} / 20` },
+                { label: "家庭 Family", value: `${form.family_score} / 20` },
+                { label: "關係 Relation", value: `${form.relation_score} / 20` },
+                { label: "總分", value: `${totalScore} / 100` },
+              ]},
+              { title: "", columns: [
+                { title: "PART 1 事業", items: [
+                  { label: "創造的價值", value: form.career_value },
+                  { label: "成就", value: form.career_achievement },
+                  { label: "卡關", value: form.career_stuck },
+                ]},
+                { title: "PART 2 財富", items: [
+                  { label: "收入變化", value: form.wealth_income_change === "growth" ? "成長" : form.wealth_income_change === "stable" ? "持平" : "下降" },
+                  { label: "新增收入來源", value: form.wealth_new_source },
+                  { label: "投資/資產變化", value: form.wealth_investment },
+                ]},
+              ]},
+              { title: "", columns: [
+                { title: "PART 3 健康", items: [
+                  { label: "作息", value: form.health_routine === "regular" ? "規律" : form.health_routine === "normal" ? "普通" : "不佳" },
+                  { label: "健康狀態", value: form.health_status },
+                ]},
+                { title: "PART 4 家庭", items: [
+                  { label: "陪伴活動", value: form.family_activity },
+                  { label: "關鍵互動", value: form.family_interaction },
+                ]},
+              ]},
+              { title: "PART 5 關係", items: [
+                { label: "新增重要連結", value: form.relation_new_important },
+                { label: "重要互動事件", value: form.relation_interaction },
+              ]},
+              { title: "本月關鍵反思", items: [
+                { label: "突破", value: form.reflection_breakthrough },
+                { label: "學習", value: form.reflection_learning },
+                { label: "錯誤", value: form.reflection_mistake },
+              ]},
+            ]}
+            onExportPDF={() =>
               exportPDF({
                 reportTitle: "人生五域平衡月報告",
                 subtitle: `${year} 年 ${month} 月`,
@@ -552,11 +597,7 @@ export default function MonthlyReportPage() {
                 ],
               })
             }
-            variant="outline"
-            className="w-full border-gold/30 text-gold hover:bg-gold/10 h-12"
-          >
-            匯出 PDF
-          </Button>
+          />
         </form>
       </main>
     </div>

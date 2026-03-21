@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { exportPDF } from "@/lib/export-pdf";
+import ReportPreview from "@/components/report-preview";
 
 function getWeekNumber(d: Date): number {
   const start = new Date(d.getFullYear(), 0, 1);
@@ -232,24 +233,39 @@ export default function WeeklyAltruismPage() {
             {saving ? "儲存中..." : existing ? "更新週報" : "提交週報"}
           </Button>
 
-          <Button
-            type="button"
-            onClick={() =>
+          <ReportPreview
+            reportTitle="利他影響力週報"
+            subtitle={`${year} 年 第 ${weekNumber} 週`}
+            date={`${year}-W${weekNumber}`}
+            userName={userName}
+            sections={[
+              { title: "影響力總覽", items: [
+                { label: "分享", value: `${sharesCount} 次` },
+                { label: "幫助", value: `${helpsCount} 次` },
+                { label: "引薦", value: `${referralsCount} 次` },
+                { label: "總計", value: `${totalImpact} 次` },
+              ]},
+              { title: "", columns: [
+                { title: "分享 Share", content: sharesDetail },
+                { title: "幫助 Help", content: helpsDetail },
+              ]},
+              { title: "引薦 Refer", content: referralsDetail },
+              { title: "本週反思", content: reflection },
+              { title: "群組公佈", checks: [{ label: "已在群裡完成公佈", checked: announcedInGroup }] },
+            ]}
+            onExportPDF={() =>
               exportPDF({
                 reportTitle: "利他影響力週報",
                 subtitle: `${year} 年 第 ${weekNumber} 週`,
                 date: `${year}-W${weekNumber}`,
                 userName,
                 sections: [
-                  {
-                    title: "影響力總覽",
-                    content: [
-                      { label: "分享次數", value: `${sharesCount} 次` },
-                      { label: "幫助次數", value: `${helpsCount} 次` },
-                      { label: "引薦次數", value: `${referralsCount} 次` },
-                      { label: "總計", value: `${sharesCount + helpsCount + referralsCount} 次` },
-                    ],
-                  },
+                  { title: "影響力總覽", content: [
+                    { label: "分享次數", value: `${sharesCount} 次` },
+                    { label: "幫助次數", value: `${helpsCount} 次` },
+                    { label: "引薦次數", value: `${referralsCount} 次` },
+                    { label: "總計", value: `${totalImpact} 次` },
+                  ]},
                   { title: "分享內容", content: sharesDetail },
                   { title: "幫助紀錄", content: helpsDetail },
                   { title: "引薦紀錄", content: referralsDetail },
@@ -257,11 +273,7 @@ export default function WeeklyAltruismPage() {
                 ],
               })
             }
-            variant="outline"
-            className="w-full border-gold/30 text-gold hover:bg-gold/10 h-12"
-          >
-            匯出 PDF
-          </Button>
+          />
         </form>
       </main>
     </div>
