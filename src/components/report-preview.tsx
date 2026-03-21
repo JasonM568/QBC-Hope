@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
+import html2canvas from "html2canvas";
 
 interface CheckItem {
   label: string;
@@ -25,14 +26,6 @@ interface ReportPreviewProps {
   onExportPDF?: () => void;
 }
 
-function CheckMark({ checked, label }: { checked: boolean; label: string }) {
-  return (
-    <span className={`${checked ? "text-gold" : "text-muted-foreground/50"}`} style={{ fontSize: 14 }}>
-      {checked ? "✓" : "○"} {label}
-    </span>
-  );
-}
-
 export default function ReportPreview({
   reportTitle,
   subtitle,
@@ -42,9 +35,11 @@ export default function ReportPreview({
   onExportPDF,
 }: ReportPreviewProps) {
   const [open, setOpen] = useState(false);
-  const previewRef = useRef<HTMLDivElement>(null);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [generating, setGenerating] = useState(false);
+  const renderRef = useRef<HTMLDivElement>(null);
 
-  // 打開時鎖定背景滾動
+  // 鎖定背景滾動
   useEffect(() => {
     if (open) {
       const scrollY = window.scrollY;
@@ -64,15 +59,53 @@ export default function ReportPreview({
     }
   }, [open]);
 
-  if (!open) {
-    return (
+  const generateImage = useCallback(async () => {
+    if (!renderRef.current) return;
+    setGenerating(true);
+    setOpen(true);
+
+    // 等 DOM 渲染完
+    await new Promise((r) => setTimeout(r, 100));
+
+    try {
+      const canvas = await html2canvas(renderRef.current, {
+        backgroundColor: "#0A0A0A",
+        scale: 2, // 2x 高清
+        useCORS: true,
+        logging: false,
+      });
+      const url = canvas.toDataURL("image/png");
+      setImageUrl(url);
+    } catch {
+      console.error("Failed to generate image");
+    }
+    setGenerating(false);
+  }, []);
+
+  function handleClose() {
+    setOpen(false);
+    setImageUrl(null);
+  }
+
+  async function handleDownload() {
+    if (!imageUrl) return;
+    const link = document.createElement("a");
+    link.download = `HOPE_${reportTitle}_${date}.png`;
+    link.href = imageUrl;
+    link.click();
+  }
+
+  return (
+    <>
+      {/* 按鈕列 */}
       <div className="flex gap-3">
         <Button
           type="button"
-          onClick={() => setOpen(true)}
+          onClick={generateImage}
+          disabled={generating}
           className="flex-1 bg-gold text-black hover:bg-gold-light font-semibold h-12"
         >
-          預覽報表
+          {generating ? "產生中..." : "預覽報表"}
         </Button>
         {onExportPDF && (
           <Button
@@ -85,105 +118,140 @@ export default function ReportPreview({
           </Button>
         )}
       </div>
-    );
-  }
 
-  return (
-    <div
-      className="fixed inset-0 z-[100] flex flex-col bg-black/80 backdrop-blur-sm"
-      style={{ touchAction: "none" }}
-    >
-      {/* 操作列 */}
-      <div className="flex items-center justify-between px-4 py-3 bg-card border-b border-border shrink-0">
-        <p className="text-sm text-muted-foreground">截圖此畫面即可分享到群組</p>
-        <div className="flex gap-2">
-          {onExportPDF && (
-            <Button
-              size="sm"
-              onClick={onExportPDF}
-              variant="outline"
-              className="border-gold/30 text-gold hover:bg-gold/10 text-xs"
-            >
-              匯出 PDF
-            </Button>
-          )}
-          <Button
-            size="sm"
-            onClick={() => setOpen(false)}
-            variant="outline"
-            className="text-xs"
-          >
-            關閉
-          </Button>
-        </div>
-      </div>
-
-      {/* 預覽內容 - 可滾動 */}
+      {/* 隱藏的 HTML 渲染區（用來產生圖片） */}
       <div
-        className="flex-1 overflow-y-auto p-4 flex justify-center"
-        style={{ WebkitOverflowScrolling: "touch", overscrollBehavior: "contain", touchAction: "pan-y" }}
+        style={{ position: "fixed", left: "-9999px", top: 0, width: 720 }}
+        aria-hidden
       >
-        <div
-          ref={previewRef}
-          className="w-full max-w-2xl bg-[#0A0A0A] rounded-xl border border-border overflow-hidden h-fit"
-        >
+        <div ref={renderRef} style={{ width: 720, background: "#0A0A0A", padding: 0 }}>
           {/* 標題列 */}
-          <div className="bg-[#111] px-5 py-4 border-b border-gold/30">
-            <div className="flex items-center justify-between">
+          <div style={{ background: "#111", padding: "20px 24px", borderBottom: "2px solid #D4AF37" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
               <div>
-                <h1 className="font-bold text-gold" style={{ fontSize: 22 }}>{reportTitle}</h1>
+                <div style={{ fontSize: 22, fontWeight: 700, color: "#D4AF37" }}>{reportTitle}</div>
                 {subtitle && (
-                  <p className="text-gold/70 mt-0.5" style={{ fontSize: 18 }}>{subtitle}</p>
+                  <div style={{ fontSize: 18, color: "#D4AF37B3", marginTop: 4 }}>{subtitle}</div>
                 )}
               </div>
-              <div className="text-right">
-                <p className="font-semibold text-foreground" style={{ fontSize: 18 }}>{userName}</p>
-                <p className="text-muted-foreground" style={{ fontSize: 16 }}>{date}</p>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ fontSize: 18, fontWeight: 600, color: "#EDEDEF" }}>{userName}</div>
+                <div style={{ fontSize: 16, color: "#A1A1AA", marginTop: 2 }}>{date}</div>
               </div>
             </div>
           </div>
 
           {/* 內容區 */}
-          <div className="p-4 space-y-3">
+          <div style={{ padding: 16 }}>
             {sections.map((section, i) => {
-              // 雙欄排版
               if (section.columns && section.columns.length === 2) {
                 return (
-                  <div key={i} className="grid grid-cols-2 gap-3">
+                  <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
                     {section.columns.map((col, ci) => (
-                      <SectionCard key={ci} section={col} />
+                      <RenderSection key={ci} section={col} />
                     ))}
                   </div>
                 );
               }
-              return <SectionCard key={i} section={section} />;
+              return (
+                <div key={i} style={{ marginBottom: 12 }}>
+                  <RenderSection section={section} />
+                </div>
+              );
             })}
           </div>
 
           {/* 底部 */}
-          <div className="px-5 py-3 border-t border-border/50 text-center">
-            <p className="font-bold text-gold" style={{ fontSize: 18 }}>HOPE 人生作業系統</p>
+          <div style={{ borderTop: "1px solid #27272A", padding: "14px 24px", textAlign: "center" }}>
+            <div style={{ fontSize: 18, fontWeight: 700, color: "#D4AF37" }}>HOPE 人生作業系統</div>
           </div>
         </div>
       </div>
-    </div>
+
+      {/* 全螢幕圖片預覽 */}
+      {open && (
+        <div
+          className="fixed inset-0 z-[100] flex flex-col bg-black/90"
+          style={{ touchAction: "none" }}
+        >
+          {/* 操作列 */}
+          <div className="flex items-center justify-between px-4 py-3 bg-card border-b border-border shrink-0">
+            <p className="text-sm text-muted-foreground">長按圖片可儲存</p>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                onClick={handleDownload}
+                disabled={!imageUrl}
+                className="bg-gold text-black hover:bg-gold-light text-xs font-semibold"
+              >
+                儲存圖片
+              </Button>
+              {onExportPDF && (
+                <Button
+                  size="sm"
+                  onClick={onExportPDF}
+                  variant="outline"
+                  className="border-gold/30 text-gold hover:bg-gold/10 text-xs"
+                >
+                  匯出 PDF
+                </Button>
+              )}
+              <Button
+                size="sm"
+                onClick={handleClose}
+                variant="outline"
+                className="text-xs"
+              >
+                關閉
+              </Button>
+            </div>
+          </div>
+
+          {/* 圖片顯示區 */}
+          <div
+            className="flex-1 overflow-y-auto flex justify-center p-4"
+            style={{ WebkitOverflowScrolling: "touch", overscrollBehavior: "contain", touchAction: "pan-y" }}
+          >
+            {generating && (
+              <div className="flex items-center justify-center h-full">
+                <p className="text-muted-foreground">產生報表圖片中...</p>
+              </div>
+            )}
+            {imageUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={imageUrl}
+                alt={reportTitle}
+                className="w-full max-w-2xl h-auto rounded-lg"
+                style={{ userSelect: "none" }}
+              />
+            )}
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
-function SectionCard({ section }: { section: PreviewSection }) {
+// 用 inline style 渲染（html2canvas 不支援 Tailwind class）
+function RenderSection({ section }: { section: PreviewSection }) {
   return (
-    <div className="rounded-lg border border-border/60 overflow-hidden">
+    <div style={{ border: "1px solid #27272A80", borderRadius: 8, overflow: "hidden" }}>
       {/* Section 標題 */}
-      <div className="bg-gold/10 px-3 py-2">
-        <h3 className="font-semibold text-gold" style={{ fontSize: 14 }}>{section.title}</h3>
-      </div>
+      {section.title && (
+        <div style={{ background: "#D4AF3718", padding: "8px 12px" }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: "#D4AF37" }}>{section.title}</div>
+        </div>
+      )}
 
-      <div className="px-3 py-2.5 space-y-2">
+      <div style={{ padding: "10px 12px" }}>
         {/* 勾選項 */}
         {section.checks && section.checks.length > 0 && (
-          <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 16px", marginBottom: section.items || section.content ? 8 : 0 }}>
             {section.checks.map((c, i) => (
-              <CheckMark key={i} checked={c.checked} label={c.label} />
+              <span key={i} style={{ fontSize: 14, color: c.checked ? "#D4AF37" : "#71717A80" }}>
+                {c.checked ? "✓" : "○"} {c.label}
+              </span>
             ))}
           </div>
         )}
@@ -191,19 +259,19 @@ function SectionCard({ section }: { section: PreviewSection }) {
         {/* Key-value 項目 */}
         {section.items &&
           section.items.map((item, i) => (
-            <div key={i}>
-              <p className="text-muted-foreground" style={{ fontSize: 12 }}>{item.label}</p>
-              <p className="text-foreground/90 whitespace-pre-wrap" style={{ fontSize: 14 }}>
+            <div key={i} style={{ marginBottom: 6 }}>
+              <div style={{ fontSize: 12, color: "#A1A1AA" }}>{item.label}</div>
+              <div style={{ fontSize: 14, color: "#EDEDEFE6", whiteSpace: "pre-wrap" }}>
                 {item.value || "—"}
-              </p>
+              </div>
             </div>
           ))}
 
         {/* 純文字 */}
         {section.content && (
-          <p className="text-foreground/90 whitespace-pre-wrap" style={{ fontSize: 14 }}>
+          <div style={{ fontSize: 14, color: "#EDEDEFE6", whiteSpace: "pre-wrap" }}>
             {section.content}
-          </p>
+          </div>
         )}
       </div>
     </div>
