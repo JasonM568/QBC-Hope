@@ -27,7 +27,7 @@ interface ReportPreviewProps {
 
 function CheckMark({ checked, label }: { checked: boolean; label: string }) {
   return (
-    <span className={`text-xs ${checked ? "text-gold" : "text-muted-foreground/50"}`}>
+    <span className={`${checked ? "text-gold" : "text-muted-foreground/50"}`} style={{ fontSize: 14 }}>
       {checked ? "✓" : "○"} {label}
     </span>
   );
@@ -131,14 +131,14 @@ export default function ReportPreview({
           <div className="bg-[#111] px-5 py-4 border-b border-gold/30">
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-lg font-bold text-gold">{reportTitle}</h1>
+                <h1 className="font-bold text-gold" style={{ fontSize: 22 }}>{reportTitle}</h1>
                 {subtitle && (
-                  <p className="text-xs text-gold/70 mt-0.5">{subtitle}</p>
+                  <p className="text-gold/70 mt-0.5" style={{ fontSize: 18 }}>{subtitle}</p>
                 )}
               </div>
               <div className="text-right">
-                <p className="text-base font-semibold text-foreground">{userName}</p>
-                <p className="text-sm text-muted-foreground">{date}</p>
+                <p className="font-semibold text-foreground" style={{ fontSize: 18 }}>{userName}</p>
+                <p className="text-muted-foreground" style={{ fontSize: 16 }}>{date}</p>
               </div>
             </div>
           </div>
@@ -161,8 +161,8 @@ export default function ReportPreview({
           </div>
 
           {/* 底部 */}
-          <div className="px-5 py-2 border-t border-border/50 text-center">
-            <p className="text-[10px] text-muted-foreground/50">HOPE 人生作業系統</p>
+          <div className="px-5 py-3 border-t border-border/50 text-center">
+            <p className="font-bold text-gold" style={{ fontSize: 18 }}>HOPE 人生作業系統</p>
           </div>
         </div>
       </div>
@@ -174,14 +174,14 @@ function SectionCard({ section }: { section: PreviewSection }) {
   return (
     <div className="rounded-lg border border-border/60 overflow-hidden">
       {/* Section 標題 */}
-      <div className="bg-gold/10 px-3 py-1.5">
-        <h3 className="text-xs font-semibold text-gold">{section.title}</h3>
+      <div className="bg-gold/10 px-3 py-2">
+        <h3 className="font-semibold text-gold" style={{ fontSize: 14 }}>{section.title}</h3>
       </div>
 
-      <div className="px-3 py-2 space-y-1.5">
+      <div className="px-3 py-2.5 space-y-2">
         {/* 勾選項 */}
         {section.checks && section.checks.length > 0 && (
-          <div className="flex flex-wrap gap-x-3 gap-y-1">
+          <div className="flex flex-wrap gap-x-4 gap-y-1.5">
             {section.checks.map((c, i) => (
               <CheckMark key={i} checked={c.checked} label={c.label} />
             ))}
@@ -192,8 +192,8 @@ function SectionCard({ section }: { section: PreviewSection }) {
         {section.items &&
           section.items.map((item, i) => (
             <div key={i}>
-              <p className="text-[10px] text-muted-foreground">{item.label}</p>
-              <p className="text-xs text-foreground/90 whitespace-pre-wrap">
+              <p className="text-muted-foreground" style={{ fontSize: 12 }}>{item.label}</p>
+              <p className="text-foreground/90 whitespace-pre-wrap" style={{ fontSize: 14 }}>
                 {item.value || "—"}
               </p>
             </div>
@@ -201,7 +201,7 @@ function SectionCard({ section }: { section: PreviewSection }) {
 
         {/* 純文字 */}
         {section.content && (
-          <p className="text-xs text-foreground/90 whitespace-pre-wrap">
+          <p className="text-foreground/90 whitespace-pre-wrap" style={{ fontSize: 14 }}>
             {section.content}
           </p>
         )}
