@@ -121,11 +121,23 @@ export default function DailyReportPage() {
   const [saving, setSaving] = useState(false);
   const [userName, setUserName] = useState("");
   const [message, setMessage] = useState("");
+  const [planStartDate, setPlanStartDate] = useState<string | null>(null);
+  const [planInputDate, setPlanInputDate] = useState("");
+  const [startingSaving, setStartingSaving] = useState(false);
+  const [planRound, setPlanRound] = useState(1);
   const router = useRouter();
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" });
 
   const set = <K extends keyof DailyReport>(key: K, value: DailyReport[K]) =>
     setReport((prev) => ({ ...prev, [key]: value }));
+
+  // 計算今天是第幾天
+  function calcDayNumber(startDate: string, round: number): number {
+    const start = new Date(startDate);
+    const now = new Date(today);
+    const diff = Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+    return diff - (round - 1) * 21 + 1;
+  }
 
   useEffect(() => {
     async function load() {
@@ -133,6 +145,21 @@ export default function DailyReportPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push("/auth/login"); return; }
       setUserName(user.user_metadata?.display_name || user.email || "");
+
+      // 載入計畫起始日
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("plan_start_date, plan_round")
+        .eq("id", user.id)
+        .single();
+
+      if (profile?.plan_start_date) {
+        setPlanStartDate(profile.plan_start_date);
+        const round = profile.plan_round || 1;
+        setPlanRound(round);
+        const dayNum = calcDayNumber(profile.plan_start_date, round);
+        setReport((prev) => ({ ...prev, day_number: dayNum > 0 ? dayNum : 1 }));
+      }
 
       const { data } = await supabase
         .from("daily_reports")
@@ -151,7 +178,58 @@ export default function DailyReportPage() {
       setLoading(false);
     }
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router, today]);
+
+  async function startPlan() {
+    if (!planInputDate) {
+      setMessage("請選擇起始日期");
+      return;
+    }
+    setStartingSaving(true);
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { error } = await supabase
+      .from("profiles")
+      .update({ plan_start_date: planInputDate, plan_round: 1 })
+      .eq("id", user.id);
+
+    if (error) {
+      setMessage("啟動失敗：" + error.message);
+    } else {
+      setPlanStartDate(planInputDate);
+      setPlanRound(1);
+      const dayNum = calcDayNumber(planInputDate, 1);
+      setReport((prev) => ({ ...prev, day_number: dayNum > 0 ? dayNum : 1 }));
+      setMessage("21天計畫已啟動！");
+    }
+    setStartingSaving(false);
+  }
+
+  async function startNewRound() {
+    setStartingSaving(true);
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const newRound = planRound + 1;
+    const { error } = await supabase
+      .from("profiles")
+      .update({ plan_round: newRound })
+      .eq("id", user.id);
+
+    if (error) {
+      setMessage("重新啟動失敗：" + error.message);
+    } else {
+      setPlanRound(newRound);
+      const dayNum = calcDayNumber(planStartDate!, newRound);
+      setReport((prev) => ({ ...prev, day_number: dayNum > 0 ? dayNum : 1 }));
+      setMessage(`第 ${newRound} 輪 21 天計畫已開始！`);
+    }
+    setStartingSaving(false);
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -213,6 +291,59 @@ export default function DailyReportPage() {
           )}
         </div>
 
+        {/* 計畫啟動區塊 */}
+        {!planStartDate && !loading && (
+          <div className="p-6 rounded-xl border border-gold/30 bg-card mb-6 space-y-4">
+            <h2 className="font-bold text-gold text-lg">啟動 21 天行動計畫</h2>
+            <p className="text-sm text-muted-foreground">
+              請選擇你的計畫起始日，系統將自動計算每天是第幾天。
+            </p>
+            <div className="flex items-end gap-3">
+              <div className="flex-1">
+                <Label>計畫起始日</Label>
+                <Input
+                  type="date"
+                  value={planInputDate}
+                  onChange={(e) => setPlanInputDate(e.target.value)}
+                  className="mt-1 bg-background border-border"
+                />
+              </div>
+              <Button
+                type="button"
+                onClick={startPlan}
+                disabled={startingSaving}
+                className="bg-gold text-black hover:bg-gold-light font-semibold h-10"
+              >
+                {startingSaving ? "啟動中..." : "啟動計畫"}
+              </Button>
+            </div>
+            {message && (
+              <p className={`text-sm ${message.includes("失敗") ? "text-red-400" : "text-green-400"}`}>{message}</p>
+            )}
+          </div>
+        )}
+
+        {/* 計畫已超過 21 天 */}
+        {planStartDate && report.day_number > 21 && !existing && (
+          <div className="p-6 rounded-xl border border-gold/30 bg-card mb-6 space-y-4">
+            <h2 className="font-bold text-gold text-lg">恭喜完成第 {planRound} 輪 21 天！</h2>
+            <p className="text-sm text-muted-foreground">
+              你已完成本輪 21 天行動計畫。你可以開始新的一輪，繼續保持成長動力！
+            </p>
+            <Button
+              type="button"
+              onClick={startNewRound}
+              disabled={startingSaving}
+              className="bg-gold text-black hover:bg-gold-light font-semibold h-10"
+            >
+              {startingSaving ? "啟動中..." : `開始第 ${planRound + 1} 輪`}
+            </Button>
+            {message && (
+              <p className={`text-sm ${message.includes("失敗") ? "text-red-400" : "text-green-400"}`}>{message}</p>
+            )}
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Header Info */}
           <div className="p-6 rounded-xl border border-border bg-card space-y-4">
@@ -223,13 +354,24 @@ export default function DailyReportPage() {
               </div>
               <div>
                 <Label>第幾天 (1-21)</Label>
-                <Input
-                  type="number" min={1} max={21}
-                  value={report.day_number}
-                  onChange={(e) => set("day_number", parseInt(e.target.value) || 1)}
-                  disabled={existing}
-                  className="mt-1 bg-background border-border"
-                />
+                {planStartDate ? (
+                  <div className="mt-1 flex items-center gap-2">
+                    <span className="text-2xl font-bold text-gold">
+                      Day {report.day_number > 21 ? 21 : report.day_number}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      （第 {planRound} 輪・起始日 {planStartDate}）
+                    </span>
+                  </div>
+                ) : (
+                  <Input
+                    type="number" min={1} max={21}
+                    value={report.day_number}
+                    onChange={(e) => set("day_number", parseInt(e.target.value) || 1)}
+                    disabled={existing}
+                    className="mt-1 bg-background border-border"
+                  />
+                )}
               </div>
             </div>
             <div>

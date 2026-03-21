@@ -13,3 +13,9 @@ ALTER TABLE weekly_altruism
 -- 3. 戰略定位新增「其他資源補充說明」
 ALTER TABLE strategic_positions
   ADD COLUMN IF NOT EXISTS resource_other_text TEXT DEFAULT '';
+
+-- 4. 個人 21 天計畫起始日 + 輪次
+ALTER TABLE profiles
+  ADD COLUMN IF NOT EXISTS plan_start_date DATE;
+ALTER TABLE profiles
+  ADD COLUMN IF NOT EXISTS plan_round INTEGER DEFAULT 1;
