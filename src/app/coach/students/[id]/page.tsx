@@ -2,6 +2,7 @@ import { requireRole } from "@/lib/auth-guard";
 import Navbar from "@/components/layout/navbar";
 import Link from "next/link";
 import CoachNoteForm from "./coach-note-form";
+import PlanResetForm from "./plan-reset-form";
 
 export default async function StudentDetailPage({
   params,
@@ -14,7 +15,7 @@ export default async function StudentDetailPage({
   // Verify this student is assigned to this coach
   const { data: student } = await supabase
     .from("profiles")
-    .select("id, display_name, email, created_at")
+    .select("id, display_name, email, created_at, plan_start_date, plan_round")
     .eq("id", studentId)
     .eq("coach_id", user.id)
     .single();
@@ -114,6 +115,16 @@ export default async function StudentDetailPage({
               </p>
             </div>
           )}
+        </div>
+
+        {/* 21天計畫管理 */}
+        <div className="mb-8">
+          <h2 className="text-lg font-semibold mb-3">21 天行動計畫</h2>
+          <PlanResetForm
+            studentId={studentId}
+            currentStartDate={student.plan_start_date || null}
+            currentRound={student.plan_round || 1}
+          />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
