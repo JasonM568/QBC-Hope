@@ -264,11 +264,11 @@ export default function CapitalInventoryPage() {
             <div className="grid grid-cols-3 gap-4">
               <div>
                 <Label>每年閱讀（本書）</Label>
-                <Input type="number" min={0} value={form.know_books_per_year} onChange={(e) => set("know_books_per_year", parseInt(e.target.value) || 0)} className="mt-1 bg-background border-border" />
+                <Input type="number" min={0} value={form.know_books_per_year || ""} onChange={(e) => set("know_books_per_year", e.target.value === "" ? 0 : parseInt(e.target.value) || 0)} className="mt-1 bg-background border-border" />
               </div>
               <div>
                 <Label>每年學習（個課）</Label>
-                <Input type="number" min={0} value={form.know_courses_per_year} onChange={(e) => set("know_courses_per_year", parseInt(e.target.value) || 0)} className="mt-1 bg-background border-border" />
+                <Input type="number" min={0} value={form.know_courses_per_year || ""} onChange={(e) => set("know_courses_per_year", e.target.value === "" ? 0 : parseInt(e.target.value) || 0)} className="mt-1 bg-background border-border" />
               </div>
               <div>
                 <Label>評分 B (1-15)：{form.know_score_b}</Label>
@@ -422,10 +422,10 @@ export default function CapitalInventoryPage() {
                     <tr key={row.label} className="border-b border-border/50">
                       <td className="py-2">{row.label}</td>
                       <td className="py-2 text-center">
-                        <Input type="number" min={0} value={form[row.bKey]} onChange={(e) => set(row.bKey, parseInt(e.target.value) || 0)} className="w-20 mx-auto text-center bg-background border-border" />
+                        <Input type="number" min={0} value={form[row.bKey] || ""} onChange={(e) => set(row.bKey, e.target.value === "" ? 0 : parseInt(e.target.value) || 0)} className="w-20 mx-auto text-center bg-background border-border" />
                       </td>
                       <td className="py-2 text-center">
-                        <Input type="number" min={0} value={form[row.aKey]} onChange={(e) => set(row.aKey, parseInt(e.target.value) || 0)} className="w-20 mx-auto text-center bg-background border-border" />
+                        <Input type="number" min={0} value={form[row.aKey] || ""} onChange={(e) => set(row.aKey, e.target.value === "" ? 0 : parseInt(e.target.value) || 0)} className="w-20 mx-auto text-center bg-background border-border" />
                       </td>
                     </tr>
                   ))}

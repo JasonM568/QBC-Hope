@@ -242,7 +242,7 @@ export default function MonthlyReportPage() {
                 ].map((item) => (
                   <div key={item.key} className="flex items-center justify-between py-1">
                     <span className="text-sm">{item.label}</span>
-                    <Input type="number" min={0} max={20} value={form[item.key]} onChange={(e) => set(item.key, parseInt(e.target.value) || 0)} className="w-16 text-center bg-background border-border h-8 text-sm" />
+                    <Input type="number" min={0} max={20} value={form[item.key] || ""} onChange={(e) => set(item.key, e.target.value === "" ? 0 : parseInt(e.target.value) || 0)} className="w-16 text-center bg-background border-border h-8 text-sm" />
                   </div>
                 ))}
                 <div className="flex items-center justify-between py-1 border-t border-border mt-1">

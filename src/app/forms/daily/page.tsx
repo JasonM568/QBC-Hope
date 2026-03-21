@@ -49,6 +49,8 @@ interface DailyReport {
   score_note: string;
   // PART 8
   tomorrow_action: string;
+  // 公佈
+  announced_in_group: boolean;
 }
 
 const emptyReport: DailyReport = {
@@ -81,6 +83,7 @@ const emptyReport: DailyReport = {
   compare_yesterday: "",
   score_note: "",
   tomorrow_action: "",
+  announced_in_group: false,
 };
 
 function Checkbox({ checked, onChange, label, disabled }: {
@@ -119,7 +122,7 @@ export default function DailyReportPage() {
   const [userName, setUserName] = useState("");
   const [message, setMessage] = useState("");
   const router = useRouter();
-  const today = new Date().toISOString().split("T")[0];
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" });
 
   const set = <K extends keyof DailyReport>(key: K, value: DailyReport[K]) =>
     setReport((prev) => ({ ...prev, [key]: value }));
@@ -435,6 +438,16 @@ export default function DailyReportPage() {
                 className="mt-1 bg-background border-border"
               />
             </div>
+          </div>
+
+          {/* 群組公佈確認 */}
+          <div className="p-4 rounded-xl border border-gold/30 bg-card">
+            <Checkbox
+              checked={report.announced_in_group}
+              onChange={(v) => set("announced_in_group", v)}
+              label="是否已在群裡完成公佈？"
+              disabled={existing}
+            />
           </div>
 
           {message && (

@@ -27,6 +27,7 @@ export default function WeeklyAltruismPage() {
   const [helpsDetail, setHelpsDetail] = useState("");
   const [referralsDetail, setReferralsDetail] = useState("");
   const [reflection, setReflection] = useState("");
+  const [announcedInGroup, setAnnouncedInGroup] = useState(false);
   const [userName, setUserName] = useState("");
   const [existing, setExisting] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -57,6 +58,7 @@ export default function WeeklyAltruismPage() {
         setHelpsDetail(data.helps_detail || "");
         setReferralsDetail(data.referrals_detail || "");
         setReflection(data.reflection || "");
+        setAnnouncedInGroup(data.announced_in_group || false);
         setExisting(true);
       }
       setLoading(false);
@@ -80,6 +82,7 @@ export default function WeeklyAltruismPage() {
       helps_count: helpsCount, helps_detail: helpsDetail,
       referrals_count: referralsCount, referrals_detail: referralsDetail,
       reflection,
+      announced_in_group: announcedInGroup,
     };
 
     const { error } = existing
@@ -136,8 +139,8 @@ export default function WeeklyAltruismPage() {
               <Label className="shrink-0">次數</Label>
               <Input
                 type="number" min={0}
-                value={sharesCount}
-                onChange={(e) => setSharesCount(parseInt(e.target.value) || 0)}
+                value={sharesCount || ""}
+                onChange={(e) => setSharesCount(e.target.value === "" ? 0 : parseInt(e.target.value) || 0)}
                 className="w-24 bg-background border-border"
               />
             </div>
@@ -158,8 +161,8 @@ export default function WeeklyAltruismPage() {
               <Label className="shrink-0">次數</Label>
               <Input
                 type="number" min={0}
-                value={helpsCount}
-                onChange={(e) => setHelpsCount(parseInt(e.target.value) || 0)}
+                value={helpsCount || ""}
+                onChange={(e) => setHelpsCount(e.target.value === "" ? 0 : parseInt(e.target.value) || 0)}
                 className="w-24 bg-background border-border"
               />
             </div>
@@ -180,8 +183,8 @@ export default function WeeklyAltruismPage() {
               <Label className="shrink-0">次數</Label>
               <Input
                 type="number" min={0}
-                value={referralsCount}
-                onChange={(e) => setReferralsCount(parseInt(e.target.value) || 0)}
+                value={referralsCount || ""}
+                onChange={(e) => setReferralsCount(e.target.value === "" ? 0 : parseInt(e.target.value) || 0)}
                 className="w-24 bg-background border-border"
               />
             </div>
@@ -204,6 +207,19 @@ export default function WeeklyAltruismPage() {
               rows={4}
               className="mt-2 bg-background border-border"
             />
+          </div>
+
+          {/* 群組公佈確認 */}
+          <div className="p-4 rounded-xl border border-gold/30 bg-card">
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={announcedInGroup}
+                onChange={(e) => setAnnouncedInGroup(e.target.checked)}
+                className="w-4 h-4 rounded border-border accent-gold"
+              />
+              <span className="text-sm">是否已在群裡完成公佈？</span>
+            </label>
           </div>
 
           {message && (

@@ -10,7 +10,7 @@ export default async function DashboardPage() {
   if (!user) redirect("/auth/login");
 
   const displayName = user.user_metadata?.display_name || user.email;
-  const today = new Date().toISOString().split("T")[0];
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" });
 
   // Check if today's daily report exists
   const { data: todayReport } = await supabase

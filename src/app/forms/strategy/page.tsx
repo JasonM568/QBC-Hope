@@ -38,6 +38,7 @@ interface StrategyForm {
   resource_fund: boolean;
   resource_brand: boolean;
   resource_experience: boolean;
+  resource_other_text: string;
   current_field: string;
   target_market: string;
   focused_battlefield: string;
@@ -52,7 +53,7 @@ interface StrategyForm {
 
 const emptyForm: StrategyForm = {
   core_ability: "", success_experience: "", unique_ability: "",
-  resource_tech: false, resource_network: false, resource_fund: false, resource_brand: false, resource_experience: false,
+  resource_tech: false, resource_network: false, resource_fund: false, resource_brand: false, resource_experience: false, resource_other_text: "",
   current_field: "", target_market: "", focused_battlefield: "",
   market_trend: "", three_year_opportunity: "", ai_tech_dividend: "",
   who_am_i: "", who_to_help: "", what_problem: "", positioning_statement: "",
@@ -164,6 +165,13 @@ export default function StrategyPage() {
                   <Checkbox checked={form.resource_brand} onChange={(v) => set("resource_brand", v)} label="品牌" />
                   <Checkbox checked={form.resource_experience} onChange={(v) => set("resource_experience", v)} label="經驗" />
                 </div>
+                <Textarea
+                  value={form.resource_other_text}
+                  onChange={(e) => set("resource_other_text", e.target.value)}
+                  placeholder="其他資源補充說明..."
+                  rows={2}
+                  className="mt-2 bg-background border-border"
+                />
               </div>
             </div>
           </div>
