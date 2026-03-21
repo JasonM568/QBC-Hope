@@ -294,7 +294,6 @@ export default function ReportPreview({
 function GridBlock({ section }: { section: PreviewSection }) {
   return (
     <div style={{ border: "1px solid #27272A80", borderRadius: 8, overflow: "hidden" }}>
-      {/* 標題列 */}
       {section.title && (
         <div style={{ background: "#D4AF3718", padding: "6px 10px" }}>
           <div style={{ fontSize: 22, fontWeight: 700, color: "#D4AF37" }}>{section.title}</div>
@@ -302,7 +301,6 @@ function GridBlock({ section }: { section: PreviewSection }) {
       )}
 
       <div style={{ padding: "8px 10px" }}>
-        {/* 勾選項 */}
         {section.checks && section.checks.length > 0 && (
           <div style={{ display: "flex", flexWrap: "wrap", gap: "3px 12px", marginBottom: section.items || section.content ? 6 : 0 }}>
             {section.checks.map((c, i) => (
@@ -313,36 +311,18 @@ function GridBlock({ section }: { section: PreviewSection }) {
           </div>
         )}
 
-        {/* Key-value 項目 */}
         {section.items &&
           section.items.map((item, i) => (
             <div key={i} style={{ marginBottom: 4 }}>
               <div style={{ fontSize: 18, color: "#A1A1AA" }}>{item.label}</div>
-              <div style={{
-                fontSize: 22,
-                color: "#EDEDEFE6",
-                whiteSpace: "pre-wrap",
-                overflow: "hidden",
-                display: "-webkit-box",
-                WebkitLineClamp: 3,
-                WebkitBoxOrient: "vertical",
-              }}>
+              <div style={{ fontSize: 22, color: "#EDEDEFE6", whiteSpace: "pre-wrap" }}>
                 {item.value || "—"}
               </div>
             </div>
           ))}
 
-        {/* 純文字 */}
         {section.content && (
-          <div style={{
-            fontSize: 22,
-            color: "#EDEDEFE6",
-            whiteSpace: "pre-wrap",
-            overflow: "hidden",
-            display: "-webkit-box",
-            WebkitLineClamp: 4,
-            WebkitBoxOrient: "vertical",
-          }}>
+          <div style={{ fontSize: 22, color: "#EDEDEFE6", whiteSpace: "pre-wrap" }}>
             {section.content}
           </div>
         )}
