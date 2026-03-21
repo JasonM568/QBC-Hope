@@ -299,25 +299,29 @@ export default function DailyReportPage() {
             <p className="text-sm text-muted-foreground">
               請選擇你的計畫起始日，系統將自動計算每天是第幾天。
             </p>
-            <div className="flex items-end gap-3">
-              <div className="flex-1">
-                <Label>計畫起始日</Label>
-                <Input
-                  type="date"
-                  value={planInputDate}
-                  onChange={(e) => setPlanInputDate(e.target.value)}
-                  className="mt-1 bg-background border-border"
-                />
-              </div>
-              <Button
-                type="button"
-                onClick={startPlan}
-                disabled={startingSaving}
-                className="bg-gold text-black hover:bg-gold-light font-semibold h-10"
-              >
-                {startingSaving ? "啟動中..." : "啟動計畫"}
-              </Button>
+            <div>
+              <Label className="mb-1 block">計畫起始日</Label>
+              <p className="text-xs text-muted-foreground mb-2">請點選下方欄位選擇日期</p>
+              <Input
+                type="date"
+                value={planInputDate}
+                onChange={(e) => setPlanInputDate(e.target.value)}
+                className="mt-1 border-gold/30 text-foreground bg-background [color-scheme:dark]"
+              />
             </div>
+            {planInputDate && (
+              <p className="text-sm text-gold">
+                已選擇：{planInputDate}
+              </p>
+            )}
+            <Button
+              type="button"
+              onClick={startPlan}
+              disabled={startingSaving || !planInputDate}
+              className="w-full bg-gold text-black hover:bg-gold-light font-semibold h-12"
+            >
+              {startingSaving ? "啟動中..." : "啟動計畫"}
+            </Button>
             {message && (
               <p className={`text-sm ${message.includes("失敗") ? "text-red-400" : "text-green-400"}`}>{message}</p>
             )}
