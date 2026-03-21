@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { exportPDF } from "@/lib/export-pdf";
+import { exportDailyPDF } from "@/lib/export-pdf";
 
 interface DailyReport {
   id?: string;
@@ -612,34 +612,46 @@ export default function DailyReportPage() {
             <Button
               type="button"
               onClick={() =>
-                exportPDF({
-                  reportTitle: "21天行動系統日報表",
-                  subtitle: `第 ${report.day_number} 天`,
-                  date: today,
+                exportDailyPDF({
                   userName,
-                  sections: [
-                    { title: "基本資訊", content: [
-                      { label: "能量狀態", value: `${report.energy_state} / 10` },
-                      { label: "今天最重要的一件事", value: report.most_important_thing },
-                    ]},
-                    { title: "PART 1：晨間信念打卡", content: [
-                      { label: "自我宣言", value: report.self_declaration },
-                    ]},
-                    { title: "PART 2：今日覺察", content: [
-                      { label: "可以更好的地方", value: report.awareness_improve },
-                      { label: "覺察到什麼", value: report.awareness_notice },
-                    ]},
-                    { title: "PART 3：今日學習", content: report.learning_content },
-                    { title: "PART 4：今日行動", content: report.action_content },
-                    { title: "PART 5：今日分享", content: report.sharing_content },
-                    { title: "PART 6：感恩時刻", content: report.gratitude },
-                    { title: "PART 7：今日評分", content: [
-                      { label: "給分", value: `${report.daily_score} / 10` },
-                      { label: "比昨天", value: report.compare_yesterday === "better" ? "好" : "差" },
-                      { label: "自評說明", value: report.score_note },
-                    ]},
-                    { title: "PART 8：明日行動", content: report.tomorrow_action },
+                  date: today,
+                  dayNumber: report.day_number,
+                  planRound: planRound,
+                  energyState: report.energy_state,
+                  mostImportantThing: report.most_important_thing,
+                  beliefs: [
+                    { label: "四大信念", checked: report.belief_four_beliefs },
+                    { label: "找到方法，看見希望", checked: report.belief_find_hope },
+                    { label: "認知決定人生", checked: report.belief_cognition },
+                    { label: "每天升級自己", checked: report.belief_upgrade },
+                    { label: "願意照亮他人", checked: report.belief_shine },
                   ],
+                  selfDeclaration: report.self_declaration,
+                  awarenessImprove: report.awareness_improve,
+                  awarenessNotice: report.awareness_notice,
+                  learningContent: report.learning_content,
+                  learningSources: [
+                    { label: "課程", checked: report.learning_course },
+                    { label: "書籍", checked: report.learning_book },
+                    { label: "對話", checked: report.learning_dialogue },
+                    { label: "觀察", checked: report.learning_observation },
+                    { label: "其他", checked: report.learning_other },
+                  ],
+                  actionContent: report.action_content,
+                  actionDomains: [
+                    { label: "事業", checked: report.action_career },
+                    { label: "財富", checked: report.action_wealth },
+                    { label: "健康", checked: report.action_health },
+                    { label: "家庭", checked: report.action_family },
+                    { label: "關係", checked: report.action_relationship },
+                  ],
+                  sharingContent: report.sharing_content,
+                  gratitude: report.gratitude,
+                  dailyScore: report.daily_score,
+                  compareYesterday: report.compare_yesterday,
+                  scoreNote: report.score_note,
+                  tomorrowAction: report.tomorrow_action,
+                  announcedInGroup: report.announced_in_group,
                 })
               }
               variant="outline"
