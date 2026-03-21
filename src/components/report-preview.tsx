@@ -36,6 +36,7 @@ export default function ReportPreview({
 }: ReportPreviewProps) {
   const [open, setOpen] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const renderRef = useRef<HTMLDivElement>(null);
 
@@ -74,8 +75,16 @@ export default function ReportPreview({
         useCORS: true,
         logging: false,
       });
-      const url = canvas.toDataURL("image/png");
-      setImageUrl(url);
+      const dataUrl = canvas.toDataURL("image/png");
+      setImageUrl(dataUrl);
+
+      // 轉成 Blob URL，iOS Safari 才能長按儲存
+      canvas.toBlob((blob) => {
+        if (blob) {
+          const objUrl = URL.createObjectURL(blob);
+          setBlobUrl(objUrl);
+        }
+      }, "image/png");
     } catch {
       console.error("Failed to generate image");
     }
@@ -85,10 +94,26 @@ export default function ReportPreview({
   function handleClose() {
     setOpen(false);
     setImageUrl(null);
+    if (blobUrl) {
+      URL.revokeObjectURL(blobUrl);
+      setBlobUrl(null);
+    }
   }
 
   async function handleDownload() {
     if (!imageUrl) return;
+    // 嘗試用 Web Share API（手機最可靠）
+    if (blobUrl && navigator.share) {
+      try {
+        const res = await fetch(blobUrl);
+        const blob = await res.blob();
+        const file = new File([blob], `HOPE_${reportTitle}_${date}.png`, { type: "image/png" });
+        await navigator.share({ files: [file] });
+        return;
+      } catch {
+        // 使用者取消或不支援，fallback 到下載
+      }
+    }
     const link = document.createElement("a");
     link.download = `HOPE_${reportTitle}_${date}.png`;
     link.href = imageUrl;
@@ -176,7 +201,7 @@ export default function ReportPreview({
         >
           {/* 操作列 */}
           <div className="flex items-center justify-between px-4 py-3 bg-card border-b border-border shrink-0">
-            <p className="text-xs text-muted-foreground">雙指可縮放 · 長按可儲存</p>
+            <p className="text-xs text-muted-foreground">長按圖片可儲存</p>
             <div className="flex gap-2">
               <Button
                 size="sm"
@@ -224,14 +249,13 @@ export default function ReportPreview({
             {imageUrl && (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={imageUrl}
+                src={blobUrl || imageUrl}
                 alt={reportTitle}
                 style={{
                   width: "100%",
                   maxWidth: 720,
                   height: "auto",
                   borderRadius: 8,
-                  userSelect: "none",
                 }}
               />
             )}
