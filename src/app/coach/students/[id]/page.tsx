@@ -3,6 +3,7 @@ import Navbar from "@/components/layout/navbar";
 import Link from "next/link";
 import CoachNoteForm from "./coach-note-form";
 import PlanResetForm from "./plan-reset-form";
+import StudentNameForm from "./student-name-form";
 
 export default async function StudentDetailPage({
   params,
@@ -89,6 +90,10 @@ export default async function StudentDetailPage({
             {student.display_name || "未設定名稱"}
           </h1>
           <p className="text-muted-foreground text-sm">{student.email}</p>
+          <StudentNameForm
+            studentId={studentId}
+            currentName={student.display_name || ""}
+          />
         </div>
 
         {/* Stats */}

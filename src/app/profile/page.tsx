@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 
 export default function ProfilePage() {
   const [displayName, setDisplayName] = useState("");
+  const [nickname, setNickname] = useState("");
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -25,6 +26,7 @@ export default function ProfilePage() {
         return;
       }
       setDisplayName(user.user_metadata?.display_name || "");
+      setNickname(user.user_metadata?.nickname || "");
       setEmail(user.email || "");
       setLoading(false);
     }
@@ -38,7 +40,10 @@ export default function ProfilePage() {
 
     const supabase = createClient();
     const { error } = await supabase.auth.updateUser({
-      data: { display_name: displayName },
+      data: {
+        display_name: displayName,
+        nickname: nickname.trim() || null,
+      },
     });
 
     // Also update profiles table
@@ -92,12 +97,22 @@ export default function ProfilePage() {
               />
             </div>
             <div>
-              <Label htmlFor="name">顯示名稱</Label>
+              <Label htmlFor="name">姓名</Label>
               <Input
                 id="name"
                 value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                placeholder="你的名字"
+                disabled
+                className="mt-1 bg-background border-border opacity-50"
+              />
+              <p className="text-xs text-muted-foreground mt-1">姓名如需修改請聯繫教練</p>
+            </div>
+            <div>
+              <Label htmlFor="nickname">顯示暱稱 <span className="text-muted-foreground font-normal">（選填）</span></Label>
+              <Input
+                id="nickname"
+                value={nickname}
+                onChange={(e) => setNickname(e.target.value)}
+                placeholder="留空則顯示姓名"
                 className="mt-1 bg-background border-border"
               />
             </div>
