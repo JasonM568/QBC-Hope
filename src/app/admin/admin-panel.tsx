@@ -44,6 +44,10 @@ export default function AdminPanel({
   deletionRequests: DeletionRequest[];
 }) {
   const [updating, setUpdating] = useState<string | null>(null);
+  const [editingUser, setEditingUser] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editNickname, setEditNickname] = useState("");
+  const [editMessage, setEditMessage] = useState("");
   const [notifConfig, setNotifConfig] = useState<NotificationConfig>({
     enabled: true,
     skip_days: [0, 6],
@@ -142,6 +146,61 @@ export default function AdminPanel({
       // Admin can then manually remove the user in Supabase
       alert("已核准移除申請。請到 Supabase 後台刪除該用戶。");
     }
+    router.refresh();
+  }
+
+  function startEditUser(user: User) {
+    setEditingUser(user.id);
+    setEditName(user.display_name || "");
+    setEditNickname("");
+    setEditMessage("");
+    // Load nickname from auth metadata via profiles isn't available,
+    // so we'll let the admin type it fresh or leave blank
+  }
+
+  async function saveUserInfo(userId: string) {
+    const trimmedName = editName.trim();
+    if (!trimmedName) {
+      setEditMessage("姓名不可為空");
+      return;
+    }
+    const chineseOnly = /^[\u4e00-\u9fff]{2,}$/;
+    if (!chineseOnly.test(trimmedName)) {
+      setEditMessage("姓名請輸入至少 2 個中文字");
+      return;
+    }
+
+    setUpdating(userId);
+    setEditMessage("");
+    const supabase = createClient();
+
+    // Update profiles table
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        display_name: trimmedName,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", userId);
+
+    if (error) {
+      setEditMessage("更新失敗：" + error.message);
+      setUpdating(null);
+      return;
+    }
+
+    // Update auth user_metadata (nickname) via admin API isn't available client-side,
+    // so we store nickname in profiles table
+    if (editNickname.trim()) {
+      await supabase
+        .from("profiles")
+        .update({ nickname: editNickname.trim() })
+        .eq("id", userId);
+    }
+
+    setUpdating(null);
+    setEditingUser(null);
+    setEditMessage("");
     router.refresh();
   }
 
@@ -353,6 +412,14 @@ export default function AdminPanel({
                   {user.id === currentUserId && (
                     <span className="text-xs text-muted-foreground">（你）</span>
                   )}
+                  {user.id !== currentUserId && editingUser !== user.id && (
+                    <button
+                      onClick={() => startEditUser(user)}
+                      className="text-xs text-gold hover:underline"
+                    >
+                      編輯
+                    </button>
+                  )}
                 </div>
                 <p className="text-sm text-muted-foreground">{user.email}</p>
               </div>
@@ -418,6 +485,52 @@ export default function AdminPanel({
                 )}
               </div>
             </div>
+
+            {/* Edit Name / Nickname Form */}
+            {editingUser === user.id && (
+              <div className="mt-3 pt-3 border-t border-border space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-muted-foreground">姓名（中文）</label>
+                    <input
+                      type="text"
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      placeholder="至少 2 個中文字"
+                      className="w-full bg-background border border-border rounded-md px-3 py-1.5 text-sm mt-1"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground">顯示暱稱（選填）</label>
+                    <input
+                      type="text"
+                      value={editNickname}
+                      onChange={(e) => setEditNickname(e.target.value)}
+                      placeholder="留空則不修改"
+                      className="w-full bg-background border border-border rounded-md px-3 py-1.5 text-sm mt-1"
+                    />
+                  </div>
+                </div>
+                {editMessage && (
+                  <p className={`text-xs ${editMessage.includes("失敗") ? "text-red-400" : "text-green-400"}`}>{editMessage}</p>
+                )}
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => saveUserInfo(user.id)}
+                    disabled={updating === user.id}
+                    className="px-3 py-1.5 bg-gold text-black rounded-lg text-sm font-semibold hover:bg-gold-light transition-colors disabled:opacity-50"
+                  >
+                    {updating === user.id ? "儲存中..." : "儲存"}
+                  </button>
+                  <button
+                    onClick={() => { setEditingUser(null); setEditMessage(""); }}
+                    className="px-3 py-1.5 bg-secondary text-muted-foreground rounded-lg text-sm"
+                  >
+                    取消
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Deletion Request Form (Master) */}
             {deleteTarget === user.id && !isAdmin && (
