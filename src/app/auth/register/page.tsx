@@ -11,6 +11,7 @@ export default function RegisterPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [nickname, setNickname] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -18,6 +19,14 @@ export default function RegisterPage() {
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+
+    // 驗證姓名：至少 2 個中文字
+    const chineseOnly = /^[\u4e00-\u9fff]{2,}$/;
+    if (!chineseOnly.test(name.trim())) {
+      setError("姓名請輸入至少 2 個中文字（僅限繁體中文）");
+      return;
+    }
+
     setLoading(true);
 
     const supabase = createClient();
@@ -26,7 +35,8 @@ export default function RegisterPage() {
       password,
       options: {
         data: {
-          display_name: name,
+          display_name: name.trim(),
+          nickname: nickname.trim() || null,
           role: "student",
         },
       },
@@ -50,7 +60,7 @@ export default function RegisterPage() {
             註冊成功！
           </h1>
           <p className="text-muted-foreground mb-6">
-            請查看你的 Email 信箱，點擊驗證連結來啟用帳號。
+            帳號已建立，現在可以登入了。
           </p>
           <Link
             href="/auth/login"
@@ -73,14 +83,25 @@ export default function RegisterPage() {
 
         <form onSubmit={handleRegister} className="space-y-4">
           <div>
-            <Label htmlFor="name">姓名</Label>
+            <Label htmlFor="name">姓名（中文）</Label>
             <Input
               id="name"
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="你的姓名"
+              placeholder="請輸入中文姓名（至少 2 個字）"
               required
+              className="mt-1 bg-card border-border"
+            />
+          </div>
+          <div>
+            <Label htmlFor="nickname">顯示暱稱 <span className="text-muted-foreground font-normal">（選填）</span></Label>
+            <Input
+              id="nickname"
+              type="text"
+              value={nickname}
+              onChange={(e) => setNickname(e.target.value)}
+              placeholder="群組中顯示的暱稱，留空則使用姓名"
               className="mt-1 bg-card border-border"
             />
           </div>
