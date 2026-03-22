@@ -109,10 +109,23 @@ export default function MonthlyReportPage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
+  const [isFirstMonth, setIsFirstMonth] = useState(false);
+  const [scoreWarning, setScoreWarning] = useState("");
   const router = useRouter();
 
   const set = <K extends keyof MonthlyForm>(key: K, value: MonthlyForm[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
+
+  function setScore(key: keyof MonthlyForm, raw: string) {
+    const num = raw === "" ? 0 : parseInt(raw) || 0;
+    if (num > 20) {
+      setScoreWarning("分數上限為 20，請輸入 0-20 之間的數值");
+      setTimeout(() => setScoreWarning(""), 3000);
+      return;
+    }
+    setScoreWarning("");
+    set(key, Math.max(0, num) as MonthlyForm[typeof key]);
+  }
 
   const totalScore = form.career_score + form.wealth_score + form.health_score + form.family_score + form.relation_score;
   const lastTotal = form.last_career_score + form.last_wealth_score + form.last_health_score + form.last_family_score + form.last_relationship_score;
@@ -156,6 +169,8 @@ export default function MonthlyReportPage() {
             last_family_score: lastData.family_score || 0,
             last_relationship_score: lastData.relation_score || 0,
           }));
+        } else {
+          setIsFirstMonth(true);
         }
       }
       setLoading(false);
@@ -233,9 +248,15 @@ export default function MonthlyReportPage() {
           {/* 人生五域平衡表分數 */}
           <div className="p-6 rounded-xl border border-gold/30 bg-card">
             <h2 className="font-bold text-gold mb-4">人生五域平衡表分數</h2>
+            {scoreWarning && (
+              <p className="text-red-400 text-sm mb-3">{scoreWarning}</p>
+            )}
             <div className="grid grid-cols-2 gap-6">
               <div>
                 <p className="text-sm text-muted-foreground mb-2">上個月分數</p>
+                {isFirstMonth && (
+                  <p className="text-xs text-gold/70 mb-2">首次填寫免填，可留空或填 0</p>
+                )}
                 {[
                   { label: "事業 Career", key: "last_career_score" as const },
                   { label: "財富 Wealth", key: "last_wealth_score" as const },
@@ -245,7 +266,7 @@ export default function MonthlyReportPage() {
                 ].map((item) => (
                   <div key={item.key} className="flex items-center justify-between py-1">
                     <span className="text-sm">{item.label}</span>
-                    <Input type="number" min={0} max={20} value={form[item.key] || ""} onChange={(e) => set(item.key, e.target.value === "" ? 0 : parseInt(e.target.value) || 0)} className="w-16 text-center bg-background border-border h-8 text-sm" />
+                    <Input type="number" min={0} max={20} value={form[item.key] || ""} onChange={(e) => setScore(item.key, e.target.value)} className="w-16 text-center bg-background border-border h-8 text-sm" />
                   </div>
                 ))}
                 <div className="flex items-center justify-between py-1 border-t border-border mt-1">
