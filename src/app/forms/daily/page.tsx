@@ -247,10 +247,14 @@ export default function DailyReportPage() {
       return;
     }
 
+    // day_number 限制在 1-21 範圍（資料庫有 CHECK 約束）
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { id: _id, ...reportData } = report;
     const { error } = await supabase.from("daily_reports").insert({
       user_id: user.id,
       report_date: today,
-      ...report,
+      ...reportData,
+      day_number: Math.min(Math.max(report.day_number, 1), 21),
     });
 
     if (error) {
