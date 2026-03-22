@@ -87,7 +87,12 @@ function LoginForm() {
         </Button>
       </form>
 
-      <p className="text-center text-sm text-muted-foreground mt-6">
+      <p className="text-center text-sm text-muted-foreground mt-4">
+        <Link href="/auth/forgot-password" className="text-gold hover:underline">
+          忘記密碼？
+        </Link>
+      </p>
+      <p className="text-center text-sm text-muted-foreground mt-3">
         還沒有帳號？{" "}
         <Link href="/auth/register" className="text-gold hover:underline">
           立即註冊
