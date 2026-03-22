@@ -171,7 +171,9 @@ export default function MonthlyReportPage() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    const payload = { user_id: user.id, year, month, ...form };
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { id: _id, user_id: _uid, created_at: _ca, ...formData } = form as MonthlyForm & Record<string, unknown>;
+    const payload = { user_id: user.id, year, month, ...formData };
 
     const { error } = existing
       ? await supabase.from("monthly_reports").update(payload).eq("user_id", user.id).eq("year", year).eq("month", month)

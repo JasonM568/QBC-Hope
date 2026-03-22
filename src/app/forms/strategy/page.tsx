@@ -104,9 +104,11 @@ export default function StrategyPage() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { id: _id, user_id: _uid, position_date: _pd, created_at: _ca, ...formData } = form as StrategyForm & Record<string, unknown>;
     const { error } = await supabase.from("strategic_positions").insert({
       user_id: user.id,
-      ...form,
+      ...formData,
     });
 
     if (error) {

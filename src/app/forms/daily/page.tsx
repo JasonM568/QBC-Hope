@@ -255,6 +255,7 @@ export default function DailyReportPage() {
       report_date: today,
       ...reportData,
       day_number: Math.min(Math.max(report.day_number, 1), 21),
+      compare_yesterday: reportData.compare_yesterday || null,
     });
 
     if (error) {
