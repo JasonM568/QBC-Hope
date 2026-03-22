@@ -457,32 +457,76 @@ export default function CapitalInventoryPage() {
             date={new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" })}
             userName={userName}
             sections={[
+              { title: "基本資訊", items: [
+                { label: "目前工作", value: form.current_job },
+                { label: "人生目標", value: form.life_goal },
+                { label: "盤點週期", value: form.inventory_cycle === "first" ? "第一次盤點" : form.inventory_cycle === "half_year" ? "半年更新" : "年度回顧" },
+              ]},
               { title: "", columns: [
-                { title: "經濟資本", items: [
+                { title: "PART 1 經濟資本", items: [
+                  { label: "收入來源", value: form.eco_income_source },
+                  { label: "收入穩定度", value: form.eco_income_stability === "stable" ? "穩定" : form.eco_income_stability === "moderate" ? "中等" : "不穩定" },
+                  { label: "資產總額", value: form.eco_asset_amount },
                   { label: "評分 A", value: `${form.eco_score_a} / 10` },
                   { label: "評分 B", value: `${form.eco_score_b} / 15` },
                   { label: "總分", value: `${ecoTotal}` },
+                ], checks: [
+                  { label: "現金", checked: form.eco_asset_cash },
+                  { label: "股票", checked: form.eco_asset_stock },
+                  { label: "不動產", checked: form.eco_asset_realestate },
+                  { label: "公司股權", checked: form.eco_asset_equity },
+                  { label: "其他", checked: form.eco_asset_other },
                 ]},
-                { title: "智識資本", items: [
+                { title: "PART 2 智識資本", items: [
+                  { label: "核心專業", value: form.know_core_expertise },
+                  { label: "每年閱讀", value: `${form.know_books_per_year} 本` },
+                  { label: "每年課程", value: `${form.know_courses_per_year} 個` },
                   { label: "評分 A", value: `${form.know_score_a} / 10` },
                   { label: "評分 B", value: `${form.know_score_b} / 15` },
                   { label: "總分", value: `${knowTotal}` },
                 ]},
               ]},
               { title: "", columns: [
-                { title: "社會資本", items: [
+                { title: "PART 3 社會資本", items: [
+                  { label: "關鍵人物", value: form.social_key_people },
                   { label: "評分 A", value: `${form.social_score_a} / 10` },
                   { label: "評分 B", value: `${form.social_score_b} / 15` },
                   { label: "總分", value: `${socialTotal}` },
+                ], checks: [
+                  { label: "願意合作", checked: form.social_cooperate },
+                  { label: "願意引薦", checked: form.social_introduce },
+                  { label: "願意投資", checked: form.social_invest },
                 ]},
-                { title: "心理資本", items: [
+                { title: "PART 4 心理資本", items: [
+                  { label: "遇到困難", value: form.psych_difficulty === "quick_recover" ? "很快恢復" : form.psych_difficulty === "need_time" ? "需要時間" : "容易放棄" },
+                  { label: "對未來", value: form.psych_future === "very_confident" ? "非常有信心" : form.psych_future === "normal" ? "一般" : "不確定" },
                   { label: "評分 A", value: `${form.psych_score_a} / 15` },
                   { label: "評分 B", value: `${form.psych_score_b} / 10` },
                   { label: "總分", value: `${psychTotal}` },
                 ]},
               ]},
-              { title: "人生資本總分", content: `${grandTotal} 分` },
-              { title: "總體評價", content: form.overall_evaluation === "beginner" ? "初階成長期" : form.overall_evaluation === "stable" ? "穩定成長期" : form.overall_evaluation === "fast" ? "高速發展期" : "成熟階段" },
+              { title: "人生資本總評", items: [
+                { label: "經濟資本", value: `${ecoTotal} 分` },
+                { label: "智識資本", value: `${knowTotal} 分` },
+                { label: "社會資本", value: `${socialTotal} 分` },
+                { label: "心理資本", value: `${psychTotal} 分` },
+                { label: "總分", value: `${grandTotal} 分` },
+                { label: "總體評價", value: form.overall_evaluation === "beginner" ? "初階成長期" : form.overall_evaluation === "stable" ? "穩定成長期" : form.overall_evaluation === "fast" ? "高速發展期" : "成熟階段" },
+              ]},
+              { title: "未來六個月成長計劃", items: [
+                { label: "經濟資本", value: form.growth_plan_economic },
+                { label: "智識資本", value: form.growth_plan_knowledge },
+                { label: "社會資本", value: form.growth_plan_social },
+                { label: "心理資本", value: form.growth_plan_psychological },
+              ]},
+              { title: "前後比較", items: [
+                { label: "經濟 Before→After", value: `${form.before_economic} → ${form.after_economic}` },
+                { label: "智識 Before→After", value: `${form.before_knowledge} → ${form.after_knowledge}` },
+                { label: "社會 Before→After", value: `${form.before_social} → ${form.after_social}` },
+                { label: "心理 Before→After", value: `${form.before_psychological} → ${form.after_psychological}` },
+                { label: "是否成長", value: form.has_grown === "yes" ? "是" : form.has_grown === "no" ? "否" : "—" },
+                { label: "感想", value: form.growth_reflection },
+              ]},
             ]}
             onExportPDF={() =>
               exportPDF({
@@ -490,27 +534,45 @@ export default function CapitalInventoryPage() {
                 date: new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" }),
                 userName,
                 sections: [
-                  { title: "經濟資本", content: [
-                    { label: "評分 A", value: `${form.eco_score_a} / 10` },
-                    { label: "評分 B", value: `${form.eco_score_b} / 15` },
-                    { label: "總分", value: `${ecoTotal}` },
+                  { title: "基本資訊", content: [
+                    { label: "目前工作", value: form.current_job },
+                    { label: "人生目標", value: form.life_goal },
                   ]},
-                  { title: "智識資本", content: [
-                    { label: "評分 A", value: `${form.know_score_a} / 10` },
-                    { label: "評分 B", value: `${form.know_score_b} / 15` },
-                    { label: "總分", value: `${knowTotal}` },
+                  { title: "PART 1 經濟資本", content: [
+                    { label: "收入來源", value: form.eco_income_source },
+                    { label: "穩定度", value: form.eco_income_stability === "stable" ? "穩定" : form.eco_income_stability === "moderate" ? "中等" : "不穩定" },
+                    { label: "資產總額", value: form.eco_asset_amount },
+                    { label: "評分", value: `A: ${form.eco_score_a}/10  B: ${form.eco_score_b}/15  總分: ${ecoTotal}` },
                   ]},
-                  { title: "社會資本", content: [
-                    { label: "評分 A", value: `${form.social_score_a} / 10` },
-                    { label: "評分 B", value: `${form.social_score_b} / 15` },
-                    { label: "總分", value: `${socialTotal}` },
+                  { title: "PART 2 智識資本", content: [
+                    { label: "核心專業", value: form.know_core_expertise },
+                    { label: "閱讀/課程", value: `${form.know_books_per_year} 本 / ${form.know_courses_per_year} 個` },
+                    { label: "評分", value: `A: ${form.know_score_a}/10  B: ${form.know_score_b}/15  總分: ${knowTotal}` },
                   ]},
-                  { title: "心理資本", content: [
-                    { label: "評分 A", value: `${form.psych_score_a} / 15` },
-                    { label: "評分 B", value: `${form.psych_score_b} / 10` },
-                    { label: "總分", value: `${psychTotal}` },
+                  { title: "PART 3 社會資本", content: [
+                    { label: "關鍵人物", value: form.social_key_people },
+                    { label: "評分", value: `A: ${form.social_score_a}/10  B: ${form.social_score_b}/15  總分: ${socialTotal}` },
                   ]},
-                  { title: "人生資本總分", content: `${grandTotal}` },
+                  { title: "PART 4 心理資本", content: [
+                    { label: "遇到困難", value: form.psych_difficulty === "quick_recover" ? "很快恢復" : form.psych_difficulty === "need_time" ? "需要時間" : "容易放棄" },
+                    { label: "對未來", value: form.psych_future === "very_confident" ? "非常有信心" : form.psych_future === "normal" ? "一般" : "不確定" },
+                    { label: "評分", value: `A: ${form.psych_score_a}/15  B: ${form.psych_score_b}/10  總分: ${psychTotal}` },
+                  ]},
+                  { title: "人生資本總分", content: `${grandTotal} 分（${form.overall_evaluation === "beginner" ? "初階成長期" : form.overall_evaluation === "stable" ? "穩定成長期" : form.overall_evaluation === "fast" ? "高速發展期" : "成熟階段"}）` },
+                  { title: "未來六個月成長計劃", content: [
+                    { label: "經濟資本", value: form.growth_plan_economic },
+                    { label: "智識資本", value: form.growth_plan_knowledge },
+                    { label: "社會資本", value: form.growth_plan_social },
+                    { label: "心理資本", value: form.growth_plan_psychological },
+                  ]},
+                  { title: "前後比較", content: [
+                    { label: "經濟", value: `${form.before_economic} → ${form.after_economic}` },
+                    { label: "智識", value: `${form.before_knowledge} → ${form.after_knowledge}` },
+                    { label: "社會", value: `${form.before_social} → ${form.after_social}` },
+                    { label: "心理", value: `${form.before_psychological} → ${form.after_psychological}` },
+                    { label: "是否成長", value: form.has_grown === "yes" ? "是" : form.has_grown === "no" ? "否" : "—" },
+                    { label: "感想", value: form.growth_reflection },
+                  ]},
                 ],
               })
             }
