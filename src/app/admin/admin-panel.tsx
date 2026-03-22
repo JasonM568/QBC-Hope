@@ -675,15 +675,31 @@ export default function AdminPanel({
                   <>
                     {isAdmin ? (
                       <button
-                        onClick={() => {
-                          if (confirm(`確定要移除 ${user.display_name || user.email} 嗎？`)) {
-                            // Admin can directly handle
-                            alert("請到 Supabase 後台刪除此用戶");
+                        onClick={async () => {
+                          if (!confirm(`確定要移除 ${user.display_name || user.email} 嗎？此操作無法復原！`)) return;
+                          setUpdating(user.id);
+                          try {
+                            const res = await fetch("/api/admin/delete-user", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ targetUserId: user.id, adminUserId: currentUserId }),
+                            });
+                            const data = await res.json();
+                            if (data.success) {
+                              alert("已成功移除該用戶");
+                              router.refresh();
+                            } else {
+                              alert("移除失敗：" + (data.error || "未知錯誤"));
+                            }
+                          } catch {
+                            alert("移除失敗：網路錯誤");
                           }
+                          setUpdating(null);
                         }}
-                        className="px-2 py-1 text-xs text-red-400 hover:bg-red-400/10 rounded-md transition-colors"
+                        disabled={updating === user.id}
+                        className="px-2 py-1 text-xs text-red-400 hover:bg-red-400/10 rounded-md transition-colors disabled:opacity-50"
                       >
-                        移除
+                        {updating === user.id ? "移除中..." : "移除"}
                       </button>
                     ) : (
                       <button
