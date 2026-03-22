@@ -57,9 +57,20 @@ export default function AdminPanel({
   const [notifMessage, setNotifMessage] = useState("");
   const [deleteReason, setDeleteReason] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  // 推播功能
+  const [broadcastMsg, setBroadcastMsg] = useState("");
+  const [broadcastMode, setBroadcastMode] = useState<"immediate" | "scheduled">("immediate");
+  const [broadcastDate, setBroadcastDate] = useState("");
+  const [broadcastTime, setBroadcastTime] = useState("09:00");
+  const [broadcastSending, setBroadcastSending] = useState(false);
+  const [broadcastResult, setBroadcastResult] = useState("");
+  const [broadcastHistory, setBroadcastHistory] = useState<Array<{
+    id: string; message: string; scheduled_at: string; status: string; sent_at: string | null; created_at: string;
+  }>>([]);
   const router = useRouter();
 
   const isAdmin = viewerRole === "admin";
+  const canBroadcast = viewerRole === "admin" || viewerRole === "master";
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -76,6 +87,21 @@ export default function AdminPanel({
     }
     loadSettings();
   }, [isAdmin]);
+
+  // 載入推播歷史
+  useEffect(() => {
+    if (!canBroadcast) return;
+    async function loadBroadcasts() {
+      const supabase = createClient();
+      const { data } = await supabase
+        .from("scheduled_broadcasts")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(10);
+      if (data) setBroadcastHistory(data);
+    }
+    loadBroadcasts();
+  }, [canBroadcast]);
 
   async function updateRole(userId: string, newRole: string) {
     if (userId === currentUserId) {
@@ -202,6 +228,72 @@ export default function AdminPanel({
     setEditingUser(null);
     setEditMessage("");
     router.refresh();
+  }
+
+  async function sendBroadcast() {
+    if (!broadcastMsg.trim()) {
+      setBroadcastResult("請輸入公告訊息");
+      return;
+    }
+    setBroadcastSending(true);
+    setBroadcastResult("");
+
+    let scheduledAt: string | undefined;
+    if (broadcastMode === "scheduled") {
+      if (!broadcastDate || !broadcastTime) {
+        setBroadcastResult("請選擇排程日期和時間");
+        setBroadcastSending(false);
+        return;
+      }
+      // 將台灣時間轉為 UTC
+      const localDate = new Date(`${broadcastDate}T${broadcastTime}:00+08:00`);
+      scheduledAt = localDate.toISOString();
+    }
+
+    try {
+      const res = await fetch("/api/line/broadcast", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: broadcastMsg.trim(),
+          scheduledAt,
+          userId: currentUserId,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setBroadcastResult(
+          data.type === "immediate"
+            ? "公告已推播到群組！"
+            : `已排程，將於 ${broadcastDate} ${broadcastTime} 推播`
+        );
+        setBroadcastMsg("");
+        // 重新載入歷史
+        const supabase = createClient();
+        const { data: history } = await supabase
+          .from("scheduled_broadcasts")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .limit(10);
+        if (history) setBroadcastHistory(history);
+      } else {
+        setBroadcastResult("推播失敗：" + (data.error || "未知錯誤"));
+      }
+    } catch {
+      setBroadcastResult("推播失敗：網路錯誤");
+    }
+    setBroadcastSending(false);
+  }
+
+  async function cancelBroadcast(id: string) {
+    const supabase = createClient();
+    await supabase
+      .from("scheduled_broadcasts")
+      .update({ status: "cancelled" })
+      .eq("id", id);
+    setBroadcastHistory((prev) =>
+      prev.map((b) => b.id === id ? { ...b, status: "cancelled" } : b)
+    );
   }
 
   function toggleSkipDay(day: number) {
@@ -390,6 +482,130 @@ export default function AdminPanel({
                 </span>
               )}
             </div>
+          </div>
+        </>
+      )}
+
+      {/* LINE 公告推播 (master + admin) */}
+      {canBroadcast && (
+        <>
+          <h2 className="text-lg font-semibold mb-4">LINE 公告推播</h2>
+          <div className="p-6 rounded-xl border border-border bg-card mb-8 space-y-4">
+            {/* 模式選擇 */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => setBroadcastMode("immediate")}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  broadcastMode === "immediate"
+                    ? "bg-gold text-black"
+                    : "bg-secondary text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                即時推播
+              </button>
+              <button
+                onClick={() => setBroadcastMode("scheduled")}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  broadcastMode === "scheduled"
+                    ? "bg-gold text-black"
+                    : "bg-secondary text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                排程推播
+              </button>
+            </div>
+
+            {/* 訊息輸入 */}
+            <div>
+              <label className="text-sm font-medium mb-1 block">公告訊息</label>
+              <textarea
+                value={broadcastMsg}
+                onChange={(e) => setBroadcastMsg(e.target.value)}
+                placeholder="輸入要推播到 LINE 群組的公告內容..."
+                rows={4}
+                className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm resize-y"
+              />
+            </div>
+
+            {/* 排程時間 */}
+            {broadcastMode === "scheduled" && (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-sm font-medium mb-1 block">日期</label>
+                  <input
+                    type="date"
+                    value={broadcastDate}
+                    onChange={(e) => setBroadcastDate(e.target.value)}
+                    className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm [color-scheme:dark]"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1 block">時間（台灣時間）</label>
+                  <input
+                    type="time"
+                    value={broadcastTime}
+                    onChange={(e) => setBroadcastTime(e.target.value)}
+                    className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm [color-scheme:dark]"
+                  />
+                </div>
+              </div>
+            )}
+
+            {broadcastResult && (
+              <p className={`text-sm ${broadcastResult.includes("失敗") ? "text-red-400" : "text-green-400"}`}>
+                {broadcastResult}
+              </p>
+            )}
+
+            <button
+              onClick={sendBroadcast}
+              disabled={broadcastSending || !broadcastMsg.trim()}
+              className="px-6 py-2 bg-gold text-black rounded-lg text-sm font-semibold hover:bg-gold-light transition-colors disabled:opacity-50"
+            >
+              {broadcastSending
+                ? "處理中..."
+                : broadcastMode === "immediate"
+                ? "立即推播"
+                : "建立排程"}
+            </button>
+
+            {/* 推播歷史 */}
+            {broadcastHistory.length > 0 && (
+              <div className="mt-4 pt-4 border-t border-border">
+                <p className="text-sm font-medium mb-3">推播紀錄</p>
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {broadcastHistory.map((b) => (
+                    <div key={b.id} className="p-3 rounded-lg border border-border bg-background text-sm">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${
+                          b.status === "sent"
+                            ? "bg-green-400/10 text-green-400"
+                            : b.status === "pending"
+                            ? "bg-gold/10 text-gold"
+                            : "bg-secondary text-muted-foreground"
+                        }`}>
+                          {b.status === "sent" ? "已發送" : b.status === "pending" ? "排程中" : "已取消"}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(b.scheduled_at).toLocaleString("zh-TW", { timeZone: "Asia/Taipei" })}
+                          </span>
+                          {b.status === "pending" && (
+                            <button
+                              onClick={() => cancelBroadcast(b.id)}
+                              className="text-xs text-red-400 hover:underline"
+                            >
+                              取消
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      <p className="text-foreground/80 whitespace-pre-wrap line-clamp-2">{b.message}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </>
       )}
