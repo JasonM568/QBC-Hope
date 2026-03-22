@@ -13,6 +13,9 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // 順便處理到期的排程推播
+  await processPendingBroadcasts();
+
   // Check notification settings
   const { data: settings } = await supabase
     .from("notification_settings")
@@ -96,6 +99,28 @@ export async function GET(request: Request) {
     submitted,
     total,
   });
+}
+
+async function processPendingBroadcasts() {
+  const now = new Date().toISOString();
+
+  const { data: pending } = await supabase
+    .from("scheduled_broadcasts")
+    .select("*")
+    .eq("status", "pending")
+    .lte("scheduled_at", now)
+    .order("scheduled_at", { ascending: true });
+
+  if (!pending || pending.length === 0) return;
+
+  for (const broadcast of pending) {
+    await sendToAllGroups(broadcast.message);
+
+    await supabase
+      .from("scheduled_broadcasts")
+      .update({ status: "sent", sent_at: new Date().toISOString() })
+      .eq("id", broadcast.id);
+  }
 }
 
 async function sendToAllGroups(text: string) {
