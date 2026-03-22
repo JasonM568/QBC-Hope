@@ -7,6 +7,14 @@ import Navbar from "@/components/layout/navbar";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 
+interface Reply {
+  id: string;
+  user_id: string;
+  content: string;
+  created_at: string;
+  profiles: { display_name: string; role: string } | null;
+}
+
 interface CheckIn {
   id: string;
   user_id: string;
@@ -15,6 +23,7 @@ interface CheckIn {
   profiles: { display_name: string } | null;
   like_count: number;
   user_liked: boolean;
+  replies: Reply[];
 }
 
 export default function CommunityPage() {
@@ -24,7 +33,13 @@ export default function CommunityPage() {
   const [posting, setPosting] = useState(false);
   const [userName, setUserName] = useState("");
   const [userId, setUserId] = useState("");
+  const [userRole, setUserRole] = useState("");
+  const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [replyContent, setReplyContent] = useState("");
+  const [replyPosting, setReplyPosting] = useState(false);
   const router = useRouter();
+
+  const canReply = userRole === "coach" || userRole === "admin" || userRole === "master";
 
   const loadCheckins = useCallback(async () => {
     const supabase = createClient();
@@ -36,6 +51,14 @@ export default function CommunityPage() {
     setUserId(user.id);
     setUserName(user.user_metadata?.display_name || user.email || "");
 
+    // 取得用戶角色
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+    if (profile) setUserRole(profile.role);
+
     const { data } = await supabase
       .from("daily_checkins")
       .select(`
@@ -46,21 +69,41 @@ export default function CommunityPage() {
       .limit(50);
 
     if (data) {
-      // Get like counts and user's likes
       const checkinIds = data.map((c) => c.id);
 
-      const { data: likes } = await supabase
-        .from("checkin_likes")
-        .select("checkin_id, user_id")
-        .in("checkin_id", checkinIds);
+      // 取得按讚和回覆
+      const [likesResult, repliesResult] = await Promise.all([
+        supabase
+          .from("checkin_likes")
+          .select("checkin_id, user_id")
+          .in("checkin_id", checkinIds),
+        supabase
+          .from("checkin_replies")
+          .select(`
+            id, checkin_id, user_id, content, created_at,
+            profiles!checkin_replies_user_id_fkey(display_name, role)
+          `)
+          .in("checkin_id", checkinIds)
+          .order("created_at", { ascending: true }),
+      ]);
+
+      const likes = likesResult.data || [];
+      const replies = repliesResult.data || [];
 
       const enriched = data.map((c) => {
-        const checkinLikes = likes?.filter((l) => l.checkin_id === c.id) || [];
+        const checkinLikes = likes.filter((l) => l.checkin_id === c.id);
+        const checkinReplies = replies
+          .filter((r) => r.checkin_id === c.id)
+          .map((r) => ({
+            ...r,
+            profiles: Array.isArray(r.profiles) ? r.profiles[0] : r.profiles,
+          }));
         return {
           ...c,
           profiles: Array.isArray(c.profiles) ? c.profiles[0] : c.profiles,
           like_count: checkinLikes.length,
           user_liked: checkinLikes.some((l) => l.user_id === user.id),
+          replies: checkinReplies as Reply[],
         };
       });
 
@@ -106,6 +149,29 @@ export default function CommunityPage() {
     loadCheckins();
   }
 
+  async function handleReply(checkinId: string) {
+    if (!replyContent.trim()) return;
+    setReplyPosting(true);
+
+    const supabase = createClient();
+    await supabase.from("checkin_replies").insert({
+      checkin_id: checkinId,
+      user_id: userId,
+      content: replyContent.trim(),
+    });
+
+    setReplyContent("");
+    setReplyingTo(null);
+    setReplyPosting(false);
+    loadCheckins();
+  }
+
+  async function handleDeleteReply(replyId: string) {
+    const supabase = createClient();
+    await supabase.from("checkin_replies").delete().eq("id", replyId);
+    loadCheckins();
+  }
+
   function timeAgo(dateStr: string) {
     const diff = Date.now() - new Date(dateStr).getTime();
     const mins = Math.floor(diff / 60000);
@@ -116,6 +182,18 @@ export default function CommunityPage() {
     const days = Math.floor(hours / 24);
     return `${days} 天前`;
   }
+
+  const roleLabel: Record<string, string> = {
+    coach: "教練",
+    admin: "管理員",
+    master: "Master",
+  };
+
+  const roleBadgeColor: Record<string, string> = {
+    coach: "bg-gold/10 text-gold",
+    admin: "bg-purple-400/10 text-purple-400",
+    master: "bg-emerald-400/10 text-emerald-400",
+  };
 
   return (
     <div className="min-h-screen">
@@ -171,7 +249,7 @@ export default function CommunityPage() {
                 <p className="text-foreground/90 text-sm whitespace-pre-wrap">
                   {c.content}
                 </p>
-                <div className="mt-3 flex items-center gap-2">
+                <div className="mt-3 flex items-center gap-3">
                   <button
                     onClick={() => handleLike(c.id, c.user_liked)}
                     className={`text-sm flex items-center gap-1 transition-colors ${
@@ -182,7 +260,80 @@ export default function CommunityPage() {
                   >
                     {c.user_liked ? "★" : "☆"} {c.like_count > 0 && c.like_count}
                   </button>
+                  {canReply && (
+                    <button
+                      onClick={() => {
+                        setReplyingTo(replyingTo === c.id ? null : c.id);
+                        setReplyContent("");
+                      }}
+                      className="text-sm text-muted-foreground hover:text-gold transition-colors"
+                    >
+                      回覆
+                    </button>
+                  )}
                 </div>
+
+                {/* Replies */}
+                {c.replies.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-border space-y-2">
+                    {c.replies.map((r) => (
+                      <div key={r.id} className="pl-3 border-l-2 border-gold/30">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <span className="text-sm font-medium">
+                            {r.profiles?.display_name || "未知"}
+                          </span>
+                          {r.profiles?.role && roleLabel[r.profiles.role] && (
+                            <span className={`text-xs px-1.5 py-0.5 rounded-full ${roleBadgeColor[r.profiles.role] || ""}`}>
+                              {roleLabel[r.profiles.role]}
+                            </span>
+                          )}
+                          <span className="text-xs text-muted-foreground">
+                            {timeAgo(r.created_at)}
+                          </span>
+                          {r.user_id === userId && (
+                            <button
+                              onClick={() => handleDeleteReply(r.id)}
+                              className="text-xs text-muted-foreground hover:text-red-400 transition-colors ml-auto"
+                            >
+                              刪除
+                            </button>
+                          )}
+                        </div>
+                        <p className="text-sm text-foreground/80 whitespace-pre-wrap">
+                          {r.content}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Reply Form */}
+                {replyingTo === c.id && (
+                  <div className="mt-3 pt-3 border-t border-border">
+                    <Textarea
+                      value={replyContent}
+                      onChange={(e) => setReplyContent(e.target.value)}
+                      placeholder="回覆這則打卡..."
+                      rows={2}
+                      className="bg-background border-border mb-2 text-sm"
+                    />
+                    <div className="flex justify-end gap-2">
+                      <button
+                        onClick={() => { setReplyingTo(null); setReplyContent(""); }}
+                        className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        取消
+                      </button>
+                      <Button
+                        onClick={() => handleReply(c.id)}
+                        disabled={replyPosting || !replyContent.trim()}
+                        className="bg-gold text-black hover:bg-gold-light font-semibold text-sm h-8 px-4"
+                      >
+                        {replyPosting ? "發送中..." : "送出回覆"}
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>
