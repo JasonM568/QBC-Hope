@@ -35,6 +35,7 @@ interface DailyReport {
   score_note: string;
   tomorrow_action: string;
   announced_in_group: boolean;
+  created_at: string;
 }
 
 function Check({ checked, label }: { checked: boolean; label: string }) {
@@ -62,7 +63,14 @@ export default function DailyReportCard({ report: r }: { report: DailyReport }) 
     <div className="p-4 rounded-xl border border-border bg-card">
       {/* Header — always visible */}
       <div className="flex items-center justify-between">
-        <span className="text-sm font-semibold">{r.report_date}</span>
+        <div>
+          <span className="text-sm font-semibold">{r.report_date}</span>
+          {r.created_at && (
+            <span className="text-xs text-muted-foreground ml-2">
+              填寫 {new Date(r.created_at).toLocaleString("zh-TW", { timeZone: "Asia/Taipei", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-3 text-xs">
           <span className="text-gold">能量 {r.energy_state}</span>
           <span className="text-blue-400">評分 {r.daily_score}</span>
