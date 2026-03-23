@@ -1,4 +1,5 @@
 import { requireRole } from "@/lib/auth-guard";
+import { createServiceRoleClient } from "@/lib/supabase/server";
 import Navbar from "@/components/layout/navbar";
 import Link from "next/link";
 import CoachNoteForm from "./coach-note-form";
@@ -40,8 +41,11 @@ export default async function StudentDetailPage({
     );
   }
 
+  // Use service role client for admin/master to bypass RLS
+  const reportClient = isMaster ? createServiceRoleClient() : supabase;
+
   // Get recent daily reports
-  const { data: dailyReports } = await supabase
+  const { data: dailyReports } = await reportClient
     .from("daily_reports")
     .select("*")
     .eq("user_id", studentId)
@@ -49,7 +53,7 @@ export default async function StudentDetailPage({
     .limit(7);
 
   // Get latest monthly report
-  const { data: latestMonthly } = await supabase
+  const { data: latestMonthly } = await reportClient
     .from("monthly_reports")
     .select("*")
     .eq("user_id", studentId)
@@ -58,7 +62,7 @@ export default async function StudentDetailPage({
     .limit(1);
 
   // Get recent weekly altruism
-  const { data: weeklyReports } = await supabase
+  const { data: weeklyReports } = await reportClient
     .from("weekly_altruism")
     .select("*")
     .eq("user_id", studentId)
@@ -67,7 +71,7 @@ export default async function StudentDetailPage({
     .limit(5);
 
   // Get recent capital inventories
-  const { data: capitalReports } = await supabase
+  const { data: capitalReports } = await reportClient
     .from("capital_inventories")
     .select("*")
     .eq("user_id", studentId)
@@ -75,7 +79,7 @@ export default async function StudentDetailPage({
     .limit(3);
 
   // Get recent strategic positions
-  const { data: strategyReports } = await supabase
+  const { data: strategyReports } = await reportClient
     .from("strategic_positions")
     .select("*")
     .eq("user_id", studentId)
@@ -83,7 +87,7 @@ export default async function StudentDetailPage({
     .limit(3);
 
   // Get total report count
-  const { count: totalReports } = await supabase
+  const { count: totalReports } = await reportClient
     .from("daily_reports")
     .select("*", { count: "exact", head: true })
     .eq("user_id", studentId);
