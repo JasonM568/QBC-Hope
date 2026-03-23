@@ -36,9 +36,8 @@ export async function updateSession(request: NextRequest) {
     request.nextUrl.pathname === "/";
 
   if (!user && !isPublicRoute) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/auth/login";
-    return NextResponse.redirect(url);
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://hope.huangxi.info";
+    return NextResponse.redirect(`${siteUrl}/auth/login`);
   }
 
   return supabaseResponse;
