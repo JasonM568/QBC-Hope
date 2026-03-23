@@ -13,9 +13,6 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // 順便處理到期的排程推播
-  await processPendingBroadcasts();
-
   // Check notification settings
   const { data: settings } = await supabase
     .from("notification_settings")
@@ -39,6 +36,7 @@ export async function GET(request: Request) {
   }
 
   const today = adjustedDate.toISOString().split("T")[0];
+  const checkTime = `${today.replace(/-/g, "/")} 22:30`;
 
   // Get all active students
   const { data: students } = await supabase
@@ -61,87 +59,57 @@ export async function GET(request: Request) {
   // Find students who haven't submitted
   const missingStudents = students.filter((s) => !submittedUserIds.has(s.id));
 
-  if (missingStudents.length === 0) {
-    await sendToAllGroups(
-      `🎉 太棒了！今天（${today}）所有學員都已完成日報！\n\n繼續保持，你們都很棒！💪`
-    );
-    return NextResponse.json({ message: "All students submitted", date: today });
-  }
-
-  const names = missingStudents
-    .map((s) => s.display_name || "未設定名稱")
-    .join("、");
-
   const submitted = students.length - missingStudents.length;
   const total = students.length;
   const prefix = config.message_prefix || "📋 HOPE 日報提醒";
 
-  const message = [
-    `${prefix}（${today}）`,
-    ``,
-    `✅ 已繳交：${submitted}/${total} 人`,
-    `❌ 尚未繳交：${missingStudents.length} 人`,
-    ``,
-    `尚未繳交的學員：`,
-    names,
-    ``,
-    `📝 立即填寫：https://hope.huangxi.info/forms/daily`,
-    ``,
-    `加油！完成今天的日報 💪`,
-  ].join("\n");
+  let message: string;
 
-  await sendToAllGroups(message);
+  if (missingStudents.length === 0) {
+    message = [
+      `🎉 太棒了！今天所有學員都已完成日報！`,
+      ``,
+      `清點時間：${checkTime}`,
+      `✅ 已繳交：${total}/${total} 人`,
+      ``,
+      `繼續保持，你們都很棒！💪`,
+    ].join("\n");
+  } else {
+    const names = missingStudents
+      .map((s) => s.display_name || "未設定名稱")
+      .join("、");
+
+    message = [
+      `${prefix}`,
+      ``,
+      `清點時間：${checkTime}`,
+      `✅ 已繳交：${submitted}/${total} 人`,
+      `❌ 尚未繳交：${missingStudents.length} 人`,
+      ``,
+      `尚未繳交的學員：`,
+      names,
+      ``,
+      `📝 立即填寫：https://hope.huangxi.info/forms/daily`,
+      ``,
+      `加油！完成今天的日報 💪`,
+    ].join("\n");
+  }
+
+  // Schedule broadcast for 22:35 (5 minutes later)
+  const sendAt = new Date(now.getTime() + 5 * 60 * 1000).toISOString();
+
+  await supabase.from("scheduled_broadcasts").insert({
+    message,
+    scheduled_at: sendAt,
+    status: "pending",
+  });
 
   return NextResponse.json({
-    message: "Reminder sent",
+    message: "Check complete, broadcast scheduled for 22:35",
     date: today,
+    checkTime,
     missing: missingStudents.length,
     submitted,
     total,
   });
-}
-
-async function processPendingBroadcasts() {
-  const now = new Date().toISOString();
-
-  const { data: pending } = await supabase
-    .from("scheduled_broadcasts")
-    .select("*")
-    .eq("status", "pending")
-    .lte("scheduled_at", now)
-    .order("scheduled_at", { ascending: true });
-
-  if (!pending || pending.length === 0) return;
-
-  for (const broadcast of pending) {
-    await sendToAllGroups(broadcast.message);
-
-    await supabase
-      .from("scheduled_broadcasts")
-      .update({ status: "sent", sent_at: new Date().toISOString() })
-      .eq("id", broadcast.id);
-  }
-}
-
-async function sendToAllGroups(text: string) {
-  const { data: groups } = await supabase
-    .from("line_groups")
-    .select("group_id")
-    .eq("active", true);
-
-  if (!groups || groups.length === 0) return;
-
-  for (const group of groups) {
-    await fetch("https://api.line.me/v2/bot/message/push", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.LINE_CHANNEL_ACCESS_TOKEN}`,
-      },
-      body: JSON.stringify({
-        to: group.group_id,
-        messages: [{ type: "text", text }],
-      }),
-    });
-  }
 }
