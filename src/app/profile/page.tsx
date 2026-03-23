@@ -25,7 +25,8 @@ export default function ProfilePage() {
         router.push("/auth/login");
         return;
       }
-      setDisplayName(user.user_metadata?.display_name || "");
+      const { data: prof } = await supabase.from("profiles").select("display_name").eq("id", user.id).single();
+      setDisplayName(prof?.display_name || user.user_metadata?.display_name || "");
       setNickname(user.user_metadata?.nickname || "");
       setEmail(user.email || "");
       setLoading(false);

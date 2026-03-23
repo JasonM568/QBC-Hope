@@ -67,6 +67,13 @@ export default function AdminPanel({
   const [broadcastHistory, setBroadcastHistory] = useState<Array<{
     id: string; message: string; scheduled_at: string; status: string; sent_at: string | null; created_at: string;
   }>>([]);
+  // 搜尋
+  const [searchQuery, setSearchQuery] = useState("");
+  // 批次指派
+  const [batchMode, setBatchMode] = useState(false);
+  const [batchCoachId, setBatchCoachId] = useState("");
+  const [batchSelected, setBatchSelected] = useState<Set<string>>(new Set());
+  const [batchUpdating, setBatchUpdating] = useState(false);
   const router = useRouter();
 
   const isAdmin = viewerRole === "admin";
@@ -134,6 +141,47 @@ export default function AdminPanel({
     router.refresh();
   }
 
+  function toggleBatchSelect(userId: string) {
+    setBatchSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(userId)) next.delete(userId);
+      else next.add(userId);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    const studentIds = users.filter((u) => u.role === "student").map((u) => u.id);
+    if (batchSelected.size === studentIds.length) {
+      setBatchSelected(new Set());
+    } else {
+      setBatchSelected(new Set(studentIds));
+    }
+  }
+
+  async function batchAssignCoach() {
+    if (!batchCoachId) {
+      alert("請先選擇要指派的教練");
+      return;
+    }
+    if (batchSelected.size === 0) {
+      alert("請勾選至少一位學員");
+      return;
+    }
+    setBatchUpdating(true);
+    const supabase = createClient();
+    const ids = Array.from(batchSelected);
+    await supabase
+      .from("profiles")
+      .update({ coach_id: batchCoachId })
+      .in("id", ids);
+    setBatchUpdating(false);
+    setBatchMode(false);
+    setBatchSelected(new Set());
+    setBatchCoachId("");
+    router.refresh();
+  }
+
   async function requestDeletion(targetUserId: string) {
     if (!deleteReason.trim()) {
       alert("請填寫移除原因");
@@ -198,30 +246,22 @@ export default function AdminPanel({
 
     setUpdating(userId);
     setEditMessage("");
-    const supabase = createClient();
 
-    // Update profiles table
-    const { error } = await supabase
-      .from("profiles")
-      .update({
+    const res = await fetch("/api/admin/update-user", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId,
         display_name: trimmedName,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", userId);
+        nickname: editNickname.trim() || undefined,
+      }),
+    });
 
-    if (error) {
-      setEditMessage("更新失敗：" + error.message);
+    const result = await res.json();
+    if (!res.ok) {
+      setEditMessage("更新失敗：" + (result.error || "未知錯誤"));
       setUpdating(null);
       return;
-    }
-
-    // Update auth user_metadata (nickname) via admin API isn't available client-side,
-    // so we store nickname in profiles table
-    if (editNickname.trim()) {
-      await supabase
-        .from("profiles")
-        .update({ nickname: editNickname.trim() })
-        .eq("id", userId);
     }
 
     setUpdating(null);
@@ -347,10 +387,16 @@ export default function AdminPanel({
   return (
     <div>
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-4 gap-4 mb-8">
         <div className="p-4 rounded-xl border border-border bg-card text-center">
           <p className="text-muted-foreground text-sm">總用戶</p>
           <p className="text-2xl font-bold text-gold">{users.length}</p>
+        </div>
+        <div className="p-4 rounded-xl border border-border bg-card text-center">
+          <p className="text-muted-foreground text-sm">Master</p>
+          <p className="text-2xl font-bold text-gold">
+            {users.filter((u) => u.role === "master").length}
+          </p>
         </div>
         <div className="p-4 rounded-xl border border-border bg-card text-center">
           <p className="text-muted-foreground text-sm">教練</p>
@@ -610,16 +656,91 @@ export default function AdminPanel({
         </>
       )}
 
-      {/* User List */}
-      <h2 className="text-lg font-semibold mb-4">用戶管理</h2>
+      {/* Search + Batch Assignment */}
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-lg font-semibold">用戶管理</h2>
+        <button
+          onClick={() => { setBatchMode(!batchMode); setBatchSelected(new Set()); setBatchCoachId(""); }}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            batchMode
+              ? "bg-red-400/20 text-red-400 hover:bg-red-400/30"
+              : "bg-gold text-black hover:bg-gold-light"
+          }`}
+        >
+          {batchMode ? "取消批次" : "批次指派教練"}
+        </button>
+      </div>
+
+      {batchMode && (
+        <div className="p-4 rounded-xl border border-gold/30 bg-card mb-4 space-y-3">
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="text-sm font-medium">指派教練：</span>
+            <select
+              value={batchCoachId}
+              onChange={(e) => setBatchCoachId(e.target.value)}
+              className="bg-background border border-border rounded-md px-3 py-1.5 text-sm"
+            >
+              <option value="">選擇教練</option>
+              {coaches.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.display_name || c.email}
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={toggleSelectAll}
+              className="px-3 py-1.5 bg-secondary text-sm rounded-lg hover:bg-secondary/80 transition-colors"
+            >
+              {batchSelected.size === users.filter((u) => u.role === "student").length ? "取消全選" : "全選學員"}
+            </button>
+            <button
+              onClick={batchAssignCoach}
+              disabled={batchUpdating || !batchCoachId || batchSelected.size === 0}
+              className="px-4 py-1.5 bg-gold text-black rounded-lg text-sm font-semibold hover:bg-gold-light transition-colors disabled:opacity-50"
+            >
+              {batchUpdating ? "指派中..." : `指派 ${batchSelected.size} 位學員`}
+            </button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            請勾選下方學員列表中要指派的學員，再按「指派」按鈕
+          </p>
+        </div>
+      )}
+      <div className="mb-4">
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="搜尋姓名或 Email..."
+          className="w-full bg-background border border-border rounded-lg px-4 py-2.5 text-sm placeholder:text-muted-foreground"
+        />
+      </div>
       <div className="space-y-3">
-        {users.map((user) => (
+        {users
+          .filter((u) => {
+            if (!searchQuery.trim()) return true;
+            const q = searchQuery.toLowerCase();
+            return (
+              (u.display_name || "").toLowerCase().includes(q) ||
+              (u.email || "").toLowerCase().includes(q)
+            );
+          })
+          .map((user) => (
           <div
             key={user.id}
             className="p-4 rounded-xl border border-border bg-card"
           >
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
+              <div className="flex items-start gap-3">
+                {batchMode && user.role === "student" && (
+                  <input
+                    type="checkbox"
+                    checked={batchSelected.has(user.id)}
+                    onChange={() => toggleBatchSelect(user.id)}
+                    className="mt-1.5 w-4 h-4 accent-gold cursor-pointer"
+                  />
+                )}
+                <div>
                 <div className="flex items-center gap-2">
                   <p className="font-semibold">{user.display_name || "未設定"}</p>
                   <span className={`text-xs px-2 py-0.5 rounded-full ${roleColors[user.role] || "bg-secondary text-muted-foreground"}`}>
@@ -638,6 +759,7 @@ export default function AdminPanel({
                   )}
                 </div>
                 <p className="text-sm text-muted-foreground">{user.email}</p>
+              </div>
               </div>
 
               <div className="flex items-center gap-2 flex-wrap">

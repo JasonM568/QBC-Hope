@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,14 +32,18 @@ export default function StudentNameForm({ studentId, currentName }: StudentNameF
     setSaving(true);
     setMessage("");
 
-    const supabase = createClient();
-    const { error } = await supabase
-      .from("profiles")
-      .update({ display_name: trimmed, updated_at: new Date().toISOString() })
-      .eq("id", studentId);
+    const res = await fetch("/api/coach/update-student", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        studentId,
+        updates: { display_name: trimmed },
+      }),
+    });
+    const result = await res.json();
 
-    if (error) {
-      setMessage("更新失敗：" + error.message);
+    if (!res.ok) {
+      setMessage("更新失敗：" + (result.error || "未知錯誤"));
     } else {
       setMessage("已更新學員姓名");
       setEditing(false);

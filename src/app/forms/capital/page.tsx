@@ -126,7 +126,9 @@ export default function CapitalInventoryPage() {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push("/auth/login"); return; }
-      setUserName(user.user_metadata?.display_name || user.email || "");
+
+      const { data: prof } = await supabase.from("profiles").select("display_name").eq("id", user.id).single();
+      setUserName(prof?.display_name || user.user_metadata?.display_name || user.email || "");
       setLoading(false);
     }
     load();

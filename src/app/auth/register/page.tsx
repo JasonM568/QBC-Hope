@@ -30,7 +30,7 @@ export default function RegisterPage() {
     setLoading(true);
 
     const supabase = createClient();
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -44,6 +44,13 @@ export default function RegisterPage() {
 
     if (error) {
       setError(error.message);
+      setLoading(false);
+      return;
+    }
+
+    // Supabase 關閉 email 驗證時，重複 email 會回傳空的 identities
+    if (data?.user?.identities?.length === 0) {
+      setError("此 Email 已經註冊過了，請直接登入");
       setLoading(false);
       return;
     }

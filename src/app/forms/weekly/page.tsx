@@ -34,6 +34,7 @@ export default function WeeklyAltruismPage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
+  const [countWarning, setCountWarning] = useState("");
   const router = useRouter();
 
   useEffect(() => {
@@ -41,7 +42,9 @@ export default function WeeklyAltruismPage() {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push("/auth/login"); return; }
-      setUserName(user.user_metadata?.display_name || user.email || "");
+
+      const { data: prof } = await supabase.from("profiles").select("display_name").eq("id", user.id).single();
+      setUserName(prof?.display_name || user.user_metadata?.display_name || user.email || "");
 
       const { data } = await supabase
         .from("weekly_altruism")
@@ -110,6 +113,17 @@ export default function WeeklyAltruismPage() {
     );
   }
 
+  function setCount(setter: (v: number) => void, raw: string) {
+    const num = raw === "" ? 0 : parseInt(raw) || 0;
+    if (num > 100) {
+      setCountWarning("次數上限為 100，請輸入 0-100 之間的數值");
+      setTimeout(() => setCountWarning(""), 3000);
+      return;
+    }
+    setCountWarning("");
+    setter(Math.max(0, num));
+  }
+
   const totalImpact = sharesCount + helpsCount + referralsCount;
 
   return (
@@ -133,15 +147,18 @@ export default function WeeklyAltruismPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {countWarning && (
+            <p className="text-red-400 text-sm">{countWarning}</p>
+          )}
           {/* Shares */}
           <div className="p-6 rounded-xl border border-border bg-card">
             <h2 className="font-semibold text-gold mb-4">分享 (Share)</h2>
             <div className="flex items-center gap-4 mb-4">
               <Label className="shrink-0">次數</Label>
               <Input
-                type="number" min={0}
+                type="number" min={0} max={100}
                 value={sharesCount || ""}
-                onChange={(e) => setSharesCount(e.target.value === "" ? 0 : parseInt(e.target.value) || 0)}
+                onChange={(e) => setCount(setSharesCount, e.target.value)}
                 className="w-24 bg-background border-border"
               />
             </div>
@@ -161,9 +178,9 @@ export default function WeeklyAltruismPage() {
             <div className="flex items-center gap-4 mb-4">
               <Label className="shrink-0">次數</Label>
               <Input
-                type="number" min={0}
+                type="number" min={0} max={100}
                 value={helpsCount || ""}
-                onChange={(e) => setHelpsCount(e.target.value === "" ? 0 : parseInt(e.target.value) || 0)}
+                onChange={(e) => setCount(setHelpsCount, e.target.value)}
                 className="w-24 bg-background border-border"
               />
             </div>
@@ -183,9 +200,9 @@ export default function WeeklyAltruismPage() {
             <div className="flex items-center gap-4 mb-4">
               <Label className="shrink-0">次數</Label>
               <Input
-                type="number" min={0}
+                type="number" min={0} max={100}
                 value={referralsCount || ""}
-                onChange={(e) => setReferralsCount(e.target.value === "" ? 0 : parseInt(e.target.value) || 0)}
+                onChange={(e) => setCount(setReferralsCount, e.target.value)}
                 className="w-24 bg-background border-border"
               />
             </div>

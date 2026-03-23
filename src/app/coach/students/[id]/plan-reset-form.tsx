@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,6 +22,7 @@ export default function PlanResetForm({
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const router = useRouter();
 
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" });
 
@@ -44,17 +45,22 @@ export default function PlanResetForm({
     setSaving(true);
     setMessage("");
 
-    const supabase = createClient();
-    const { error } = await supabase
-      .from("profiles")
-      .update({ plan_start_date: startDate, plan_round: round })
-      .eq("id", studentId);
+    const res = await fetch("/api/coach/update-student", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        studentId,
+        updates: { plan_start_date: startDate, plan_round: round },
+      }),
+    });
+    const result = await res.json();
 
-    if (error) {
-      setMessage("更新失敗：" + error.message);
+    if (!res.ok) {
+      setMessage("更新失敗：" + (result.error || "未知錯誤"));
     } else {
       setMessage("已更新學員的 21 天計畫設定");
       setEditing(false);
+      router.refresh();
     }
     setSaving(false);
   }
@@ -63,19 +69,24 @@ export default function PlanResetForm({
     setSaving(true);
     setMessage("");
 
-    const supabase = createClient();
-    const { error } = await supabase
-      .from("profiles")
-      .update({ plan_start_date: null, plan_round: 1 })
-      .eq("id", studentId);
+    const res = await fetch("/api/coach/update-student", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        studentId,
+        updates: { plan_start_date: null, plan_round: 1 },
+      }),
+    });
+    const result = await res.json();
 
-    if (error) {
-      setMessage("重置失敗：" + error.message);
+    if (!res.ok) {
+      setMessage("重置失敗：" + (result.error || "未知錯誤"));
     } else {
       setStartDate("");
       setRound(1);
       setMessage("已重置，學員可重新設定起始日");
       setEditing(false);
+      router.refresh();
     }
     setSaving(false);
   }

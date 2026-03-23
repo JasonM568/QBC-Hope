@@ -1,16 +1,24 @@
 import { requireRole } from "@/lib/auth-guard";
 import Navbar from "@/components/layout/navbar";
-import Link from "next/link";
+import CoachList from "./coach-list";
 
 export default async function CoachDashboard() {
-  const { user, profile, supabase } = await requireRole(["coach", "admin"]);
+  const { user, profile, supabase } = await requireRole(["coach", "admin", "master"]);
 
-  // Get assigned students
-  const { data: students } = await supabase
+  const isMaster = profile.role === "master" || profile.role === "admin";
+
+  // Master/admin sees all students, coach sees only assigned
+  const studentsQuery = supabase
     .from("profiles")
-    .select("id, display_name, email, created_at")
-    .eq("coach_id", user.id)
+    .select("id, display_name, email, created_at, coach_id")
+    .eq("role", "student")
     .order("display_name");
+
+  if (!isMaster) {
+    studentsQuery.eq("coach_id", user.id);
+  }
+
+  const { data: students } = await studentsQuery;
 
   // Get today's date
   const today = new Date().toISOString().split("T")[0];
@@ -41,25 +49,61 @@ export default async function CoachDashboard() {
     countMap[r.user_id] = (countMap[r.user_id] || 0) + 1;
   });
 
+  // Get coach list and names for master view
+  const coachMap: Record<string, string> = {};
+  let coachList: { id: string; display_name: string; email: string; created_at: string }[] = [];
+  if (isMaster) {
+    const { data: coaches } = await supabase
+      .from("profiles")
+      .select("id, display_name, email, created_at")
+      .eq("role", "coach")
+      .order("display_name");
+    if (coaches) {
+      coachList = coaches;
+      coaches.forEach((c) => { coachMap[c.id] = c.display_name || "未設定"; });
+    }
+    // Also map coaches from student assignments
+    if (students && students.length > 0) {
+      const assignedCoachIds = Array.from(new Set(students.map((s) => s.coach_id).filter(Boolean)));
+      for (const cid of assignedCoachIds) {
+        if (!coachMap[cid]) {
+          const match = coachList.find((c) => c.id === cid);
+          if (match) coachMap[cid] = match.display_name || "未設定";
+        }
+      }
+    }
+  }
+
   // Get recent notes count
-  const { count: notesCount } = await supabase
+  const notesQuery = supabase
     .from("coach_notes")
-    .select("*", { count: "exact", head: true })
-    .eq("coach_id", user.id);
+    .select("*", { count: "exact", head: true });
+  if (!isMaster) {
+    notesQuery.eq("coach_id", user.id);
+  }
+  const { count: notesCount } = await notesQuery;
 
   return (
     <div className="min-h-screen">
-      <Navbar userName={profile.display_name} />
-      <main className="max-w-6xl mx-auto px-4 py-8">
+      <Navbar userName={profile.display_name} userRole={profile.role} />
+      <main className="max-w-6xl mx-auto px-4 py-8 pb-24">
         <div className="mb-8">
           <h1 className="text-2xl font-bold">
-            教練總覽
+            {isMaster ? "總教練總覽" : "教練總覽"}
           </h1>
-          <p className="text-muted-foreground mt-1">管理你的學員進度</p>
+          <p className="text-muted-foreground mt-1">
+            {isMaster ? "查看所有教練與學員的資料" : "管理你的學員進度"}
+          </p>
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <div className={`grid grid-cols-1 ${isMaster ? "md:grid-cols-4" : "md:grid-cols-3"} gap-4 mb-8`}>
+          {isMaster && (
+            <div className="p-6 rounded-xl border border-border bg-card">
+              <p className="text-muted-foreground text-sm">教練人數</p>
+              <p className="text-3xl font-bold text-gold mt-1">{coachList.length}</p>
+            </div>
+          )}
           <div className="p-6 rounded-xl border border-border bg-card">
             <p className="text-muted-foreground text-sm">學員人數</p>
             <p className="text-3xl font-bold text-gold mt-1">{students?.length || 0}</p>
@@ -77,51 +121,14 @@ export default async function CoachDashboard() {
           </div>
         </div>
 
-        {/* Student List */}
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold">學員列表</h2>
-          <Link
-            href="/coach/notes"
-            className="text-sm text-gold hover:underline"
-          >
-            查看所有筆記
-          </Link>
-        </div>
-
-        {!students || students.length === 0 ? (
-          <div className="p-8 rounded-xl border border-border bg-card text-center">
-            <p className="text-muted-foreground">目前沒有指派的學員</p>
-            <p className="text-muted-foreground text-sm mt-1">請聯繫管理員指派學員</p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {students.map((student) => (
-              <Link
-                key={student.id}
-                href={`/coach/students/${student.id}`}
-                className="flex items-center justify-between p-4 rounded-xl border border-border bg-card card-hover"
-              >
-                <div>
-                  <p className="font-semibold">{student.display_name || "未設定名稱"}</p>
-                  <p className="text-sm text-muted-foreground">{student.email}</p>
-                </div>
-                <div className="flex items-center gap-4 text-sm">
-                  <div className="text-right">
-                    <p className="text-muted-foreground">累計天數</p>
-                    <p className="font-semibold text-gold">{countMap[student.id] || 0}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-muted-foreground">今日</p>
-                    <p className={`font-semibold ${reportedToday.has(student.id) ? "text-green-400" : "text-yellow-400"}`}>
-                      {reportedToday.has(student.id) ? "已填" : "未填"}
-                    </p>
-                  </div>
-                  <span className="text-muted-foreground ml-2">&rarr;</span>
-                </div>
-              </Link>
-            ))}
-          </div>
-        )}
+        <CoachList
+          students={students || []}
+          coachList={coachList}
+          coachMap={coachMap}
+          countMap={countMap}
+          reportedToday={Array.from(reportedToday)}
+          isMaster={isMaster}
+        />
       </main>
     </div>
   );

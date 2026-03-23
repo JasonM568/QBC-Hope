@@ -9,7 +9,13 @@ export default async function DashboardPage() {
 
   if (!user) redirect("/auth/login");
 
-  const displayName = user.user_metadata?.display_name || user.email;
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role, display_name")
+    .eq("id", user.id)
+    .single();
+
+  const displayName = profile?.display_name || user.user_metadata?.display_name || user.email;
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" });
 
   // Check if today's daily report exists
@@ -60,7 +66,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="min-h-screen">
-      <Navbar userName={displayName} />
+      <Navbar userName={displayName} userRole={profile?.role} />
 
       <main className="max-w-6xl mx-auto px-4 py-8">
         {/* Welcome */}

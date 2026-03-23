@@ -4,27 +4,34 @@ import Link from "next/link";
 import CoachNoteForm from "./coach-note-form";
 import PlanResetForm from "./plan-reset-form";
 import StudentNameForm from "./student-name-form";
+import DailyReportCard from "./daily-report-card";
+import { WeeklyCard, MonthlyCard, CapitalCard, StrategyCard } from "./form-cards";
 
 export default async function StudentDetailPage({
   params,
 }: {
   params: { id: string };
 }) {
-  const { user, profile, supabase } = await requireRole(["coach", "admin"]);
+  const { user, profile, supabase } = await requireRole(["coach", "admin", "master"]);
   const studentId = params.id;
+  const isMaster = profile.role === "master" || profile.role === "admin";
 
-  // Verify this student is assigned to this coach
-  const { data: student } = await supabase
+  // Verify access: master/admin can see any student, coach only their own
+  const studentQuery = supabase
     .from("profiles")
     .select("id, display_name, email, created_at, plan_start_date, plan_round")
-    .eq("id", studentId)
-    .eq("coach_id", user.id)
-    .single();
+    .eq("id", studentId);
+
+  if (!isMaster) {
+    studentQuery.eq("coach_id", user.id);
+  }
+
+  const { data: student } = await studentQuery.single();
 
   if (!student) {
     return (
       <div className="min-h-screen">
-        <Navbar userName={profile.display_name} />
+        <Navbar userName={profile.display_name} userRole={profile.role} />
         <main className="max-w-4xl mx-auto px-4 py-8">
           <p className="text-muted-foreground">找不到此學員或你沒有權限查看</p>
           <Link href="/coach" className="text-gold hover:underline mt-4 inline-block">返回教練總覽</Link>
@@ -50,14 +57,30 @@ export default async function StudentDetailPage({
     .order("month", { ascending: false })
     .limit(1);
 
-  // Get latest weekly altruism
-  const { data: latestWeekly } = await supabase
+  // Get recent weekly altruism
+  const { data: weeklyReports } = await supabase
     .from("weekly_altruism")
     .select("*")
     .eq("user_id", studentId)
     .order("year", { ascending: false })
     .order("week_number", { ascending: false })
-    .limit(1);
+    .limit(5);
+
+  // Get recent capital inventories
+  const { data: capitalReports } = await supabase
+    .from("capital_inventories")
+    .select("*")
+    .eq("user_id", studentId)
+    .order("created_at", { ascending: false })
+    .limit(3);
+
+  // Get recent strategic positions
+  const { data: strategyReports } = await supabase
+    .from("strategic_positions")
+    .select("*")
+    .eq("user_id", studentId)
+    .order("created_at", { ascending: false })
+    .limit(3);
 
   // Get total report count
   const { count: totalReports } = await supabase
@@ -75,7 +98,7 @@ export default async function StudentDetailPage({
     .limit(10);
 
   const monthly = latestMonthly?.[0];
-  const weekly = latestWeekly?.[0];
+  const weekly = weeklyReports?.[0];
 
   return (
     <div className="min-h-screen">
@@ -132,6 +155,23 @@ export default async function StudentDetailPage({
           />
         </div>
 
+        {/* 提交狀態總覽 */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+          {[
+            { label: "週報", has: weeklyReports && weeklyReports.length > 0 },
+            { label: "月報", has: latestMonthly && latestMonthly.length > 0 },
+            { label: "資本盤點", has: capitalReports && capitalReports.length > 0 },
+            { label: "戰略定位", has: strategyReports && strategyReports.length > 0 },
+          ].map((item) => (
+            <div key={item.label} className={`p-3 rounded-xl border text-center ${item.has ? "border-gold/30 bg-gold/5" : "border-border bg-card"}`}>
+              <p className="text-xs text-muted-foreground">{item.label}</p>
+              <p className={`text-sm font-semibold mt-1 ${item.has ? "text-gold" : "text-red-400"}`}>
+                {item.has ? "已提交" : "未提交"}
+              </p>
+            </div>
+          ))}
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Recent Daily Reports */}
           <div>
@@ -143,64 +183,14 @@ export default async function StudentDetailPage({
             ) : (
               <div className="space-y-3">
                 {dailyReports.map((r) => (
-                  <div key={r.id} className="p-4 rounded-xl border border-border bg-card">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-semibold">{r.report_date}</span>
-                      <div className="flex gap-3 text-xs">
-                        <span className="text-gold">能量 {r.energy_state}</span>
-                        <span className="text-blue-400">評分 {r.daily_score}</span>
-                        {r.day_number && <span className="text-muted-foreground">第{r.day_number}天</span>}
-                      </div>
-                    </div>
-                    {r.most_important_thing && (
-                      <div className="mt-2">
-                        <p className="text-xs text-muted-foreground">今天最重要的一件事</p>
-                        <p className="text-sm text-foreground/80 whitespace-pre-wrap">{r.most_important_thing}</p>
-                      </div>
-                    )}
-                    {r.awareness_improve && (
-                      <div className="mt-2">
-                        <p className="text-xs text-muted-foreground">今日覺察</p>
-                        <p className="text-sm text-foreground/80 whitespace-pre-wrap">{r.awareness_improve}</p>
-                      </div>
-                    )}
-                  </div>
+                  <DailyReportCard key={r.id} report={r} />
                 ))}
               </div>
             )}
           </div>
 
-          {/* Monthly Report Snapshot */}
+          {/* Coach Notes */}
           <div>
-            {monthly && (
-              <div className="mb-6">
-                <h2 className="text-lg font-semibold mb-3">
-                  最新月報 ({monthly.year}/{monthly.month})
-                </h2>
-                <div className="p-4 rounded-xl border border-border bg-card space-y-2">
-                  {[
-                    { label: "事業", score: monthly.career_score },
-                    { label: "財富", score: monthly.wealth_score },
-                    { label: "健康", score: monthly.health_score },
-                    { label: "家庭", score: monthly.family_score },
-                    { label: "關係", score: monthly.relation_score },
-                  ].map((d) => (
-                    <div key={d.label} className="flex items-center gap-3">
-                      <span className="text-sm w-12 text-muted-foreground">{d.label}</span>
-                      <div className="flex-1 h-2 bg-secondary rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-gold rounded-full"
-                          style={{ width: `${((d.score || 0) / 20) * 100}%` }}
-                        />
-                      </div>
-                      <span className="text-sm font-semibold w-8 text-right">{d.score}/20</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Coach Notes */}
             <h2 className="text-lg font-semibold mb-3">教練筆記</h2>
             <CoachNoteForm coachId={user.id} studentId={studentId} />
 
@@ -228,6 +218,70 @@ export default async function StudentDetailPage({
               </div>
             )}
           </div>
+        </div>
+
+        {/* 週報 */}
+        <div className="mt-8">
+          <h2 className="text-lg font-semibold mb-3">利他週報</h2>
+          {!weeklyReports || weeklyReports.length === 0 ? (
+            <div className="p-6 rounded-xl border border-border bg-card">
+              <p className="text-muted-foreground text-sm">尚無週報記錄</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+              {weeklyReports.map((r) => (
+                <WeeklyCard key={r.id} report={r} />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* 月報 */}
+        <div className="mt-8">
+          <h2 className="text-lg font-semibold mb-3">五域平衡月報</h2>
+          {!latestMonthly || latestMonthly.length === 0 ? (
+            <div className="p-6 rounded-xl border border-border bg-card">
+              <p className="text-muted-foreground text-sm">尚無月報記錄</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+              {latestMonthly.map((r) => (
+                <MonthlyCard key={r.id} report={r} />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* 資本盤點 */}
+        <div className="mt-8">
+          <h2 className="text-lg font-semibold mb-3">人生資本盤點</h2>
+          {!capitalReports || capitalReports.length === 0 ? (
+            <div className="p-6 rounded-xl border border-border bg-card">
+              <p className="text-muted-foreground text-sm">尚無資本盤點記錄</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+              {capitalReports.map((r) => (
+                <CapitalCard key={r.id} report={r} />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* 戰略定位 */}
+        <div className="mt-8">
+          <h2 className="text-lg font-semibold mb-3">個人戰略定位</h2>
+          {!strategyReports || strategyReports.length === 0 ? (
+            <div className="p-6 rounded-xl border border-border bg-card">
+              <p className="text-muted-foreground text-sm">尚無戰略定位記錄</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+              {strategyReports.map((r) => (
+                <StrategyCard key={r.id} report={r} />
+              ))}
+            </div>
+          )}
         </div>
       </main>
     </div>

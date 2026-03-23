@@ -118,6 +118,7 @@ function PartHeader({ num, title }: { num: number; title: string }) {
 export default function DailyReportPage() {
   const [report, setReport] = useState<DailyReport>(emptyReport);
   const [existing, setExisting] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [userName, setUserName] = useState("");
@@ -145,14 +146,14 @@ export default function DailyReportPage() {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push("/auth/login"); return; }
-      setUserName(user.user_metadata?.display_name || user.email || "");
-
-      // 載入計畫起始日
+      // 載入計畫起始日與姓名
       const { data: profile } = await supabase
         .from("profiles")
-        .select("plan_start_date, plan_round")
+        .select("plan_start_date, plan_round, display_name")
         .eq("id", user.id)
         .single();
+
+      setUserName(profile?.display_name || user.user_metadata?.display_name || user.email || "");
 
       if (profile?.plan_start_date) {
         setPlanStartDate(profile.plan_start_date);
@@ -167,7 +168,7 @@ export default function DailyReportPage() {
         .select("*")
         .eq("user_id", user.id)
         .eq("report_date", today)
-        .single();
+        .maybeSingle();
 
       if (data) {
         setReport({
@@ -241,32 +242,46 @@ export default function DailyReportPage() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    if (existing) {
-      setMessage("今天已經填寫過了！");
-      setSaving(false);
-      return;
-    }
-
-    // day_number 限制在 1-21 範圍（資料庫有 CHECK 約束）
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { id: _id, ...reportData } = report;
-    const { error } = await supabase.from("daily_reports").insert({
-      user_id: user.id,
-      report_date: today,
+    const safeData = {
       ...reportData,
       day_number: Math.min(Math.max(report.day_number, 1), 21),
       compare_yesterday: reportData.compare_yesterday || null,
-    });
+    };
 
-    if (error) {
-      if (error.code === "23505") {
-        setMessage("今天已經填寫過了！");
+    if (existing && editing) {
+      // 修改模式：更新當天日報
+      const { error } = await supabase
+        .from("daily_reports")
+        .update(safeData)
+        .eq("user_id", user.id)
+        .eq("report_date", today);
+
+      if (error) {
+        setMessage("修改失敗：" + error.message);
       } else {
-        setMessage("儲存失敗：" + error.message);
+        setMessage("日報已修改！");
+        setEditing(false);
       }
     } else {
-      setMessage("日報已儲存！");
-      setExisting(true);
+      // 新增模式
+      const { error } = await supabase.from("daily_reports").insert({
+        user_id: user.id,
+        report_date: today,
+        ...safeData,
+      });
+
+      if (error) {
+        if (error.code === "23505") {
+          setMessage("今天已經填寫過了！");
+        } else {
+          setMessage("儲存失敗：" + error.message);
+        }
+      } else {
+        setMessage("日報已儲存！");
+        setExisting(true);
+      }
     }
     setSaving(false);
   }
@@ -378,7 +393,7 @@ export default function DailyReportPage() {
                     type="number" min={1} max={21}
                     value={report.day_number}
                     onChange={(e) => set("day_number", parseInt(e.target.value) || 1)}
-                    disabled={existing}
+                    disabled={existing && !editing}
                     className="mt-1 bg-background border-border"
                   />
                 )}
@@ -390,7 +405,7 @@ export default function DailyReportPage() {
                 type="range" min={1} max={10}
                 value={report.energy_state}
                 onChange={(e) => set("energy_state", parseInt(e.target.value))}
-                disabled={existing}
+                disabled={existing && !editing}
                 className="w-full mt-2 accent-gold"
               />
               <div className="flex justify-between text-xs text-muted-foreground mt-1">
@@ -402,7 +417,7 @@ export default function DailyReportPage() {
               <Textarea
                 value={report.most_important_thing}
                 onChange={(e) => set("most_important_thing", e.target.value)}
-                disabled={existing}
+                disabled={existing && !editing}
                 placeholder="今天最重要的一件事..."
                 rows={2}
                 className="mt-1 bg-background border-border"
@@ -415,17 +430,17 @@ export default function DailyReportPage() {
             <PartHeader num={1} title="晨間信念打卡" />
             <p className="text-sm text-muted-foreground mb-3">每天早晨朗讀</p>
             <div className="space-y-2 mb-4">
-              <Checkbox checked={report.belief_four_beliefs} onChange={(v) => set("belief_four_beliefs", v)} label="四大信念" disabled={existing} />
-              <Checkbox checked={report.belief_find_hope} onChange={(v) => set("belief_find_hope", v)} label="找到方法，看見希望" disabled={existing} />
-              <Checkbox checked={report.belief_cognition} onChange={(v) => set("belief_cognition", v)} label="人生不是被環境決定，而是被認知決定" disabled={existing} />
-              <Checkbox checked={report.belief_upgrade} onChange={(v) => set("belief_upgrade", v)} label="我每天都在升級自己" disabled={existing} />
-              <Checkbox checked={report.belief_shine} onChange={(v) => set("belief_shine", v)} label="我願意照亮他人" disabled={existing} />
+              <Checkbox checked={report.belief_four_beliefs} onChange={(v) => set("belief_four_beliefs", v)} label="四大信念" disabled={existing && !editing} />
+              <Checkbox checked={report.belief_find_hope} onChange={(v) => set("belief_find_hope", v)} label="找到方法，看見希望" disabled={existing && !editing} />
+              <Checkbox checked={report.belief_cognition} onChange={(v) => set("belief_cognition", v)} label="人生不是被環境決定，而是被認知決定" disabled={existing && !editing} />
+              <Checkbox checked={report.belief_upgrade} onChange={(v) => set("belief_upgrade", v)} label="我每天都在升級自己" disabled={existing && !editing} />
+              <Checkbox checked={report.belief_shine} onChange={(v) => set("belief_shine", v)} label="我願意照亮他人" disabled={existing && !editing} />
             </div>
             <Label>今日一句自我宣言</Label>
             <Textarea
               value={report.self_declaration}
               onChange={(e) => set("self_declaration", e.target.value)}
-              disabled={existing}
+              disabled={existing && !editing}
               placeholder="今日一句自我宣言..."
               rows={2}
               className="mt-1 bg-background border-border"
@@ -441,7 +456,7 @@ export default function DailyReportPage() {
                 <Textarea
                   value={report.awareness_improve}
                   onChange={(e) => set("awareness_improve", e.target.value)}
-                  disabled={existing}
+                  disabled={existing && !editing}
                   rows={3}
                   className="mt-1 bg-background border-border"
                 />
@@ -451,7 +466,7 @@ export default function DailyReportPage() {
                 <Textarea
                   value={report.awareness_notice}
                   onChange={(e) => set("awareness_notice", e.target.value)}
-                  disabled={existing}
+                  disabled={existing && !editing}
                   rows={3}
                   className="mt-1 bg-background border-border"
                 />
@@ -466,17 +481,17 @@ export default function DailyReportPage() {
             <Textarea
               value={report.learning_content}
               onChange={(e) => set("learning_content", e.target.value)}
-              disabled={existing}
+              disabled={existing && !editing}
               rows={3}
               className="mt-1 bg-background border-border"
             />
             <p className="text-sm text-muted-foreground mt-3 mb-2">學習來源</p>
             <div className="flex flex-wrap gap-4">
-              <Checkbox checked={report.learning_course} onChange={(v) => set("learning_course", v)} label="課程" disabled={existing} />
-              <Checkbox checked={report.learning_book} onChange={(v) => set("learning_book", v)} label="書籍" disabled={existing} />
-              <Checkbox checked={report.learning_dialogue} onChange={(v) => set("learning_dialogue", v)} label="對話" disabled={existing} />
-              <Checkbox checked={report.learning_observation} onChange={(v) => set("learning_observation", v)} label="觀察" disabled={existing} />
-              <Checkbox checked={report.learning_other} onChange={(v) => set("learning_other", v)} label="其他" disabled={existing} />
+              <Checkbox checked={report.learning_course} onChange={(v) => set("learning_course", v)} label="課程" disabled={existing && !editing} />
+              <Checkbox checked={report.learning_book} onChange={(v) => set("learning_book", v)} label="書籍" disabled={existing && !editing} />
+              <Checkbox checked={report.learning_dialogue} onChange={(v) => set("learning_dialogue", v)} label="對話" disabled={existing && !editing} />
+              <Checkbox checked={report.learning_observation} onChange={(v) => set("learning_observation", v)} label="觀察" disabled={existing && !editing} />
+              <Checkbox checked={report.learning_other} onChange={(v) => set("learning_other", v)} label="其他" disabled={existing && !editing} />
             </div>
           </div>
 
@@ -487,17 +502,17 @@ export default function DailyReportPage() {
             <Textarea
               value={report.action_content}
               onChange={(e) => set("action_content", e.target.value)}
-              disabled={existing}
+              disabled={existing && !editing}
               rows={3}
               className="mt-1 bg-background border-border"
             />
             <p className="text-sm text-muted-foreground mt-3 mb-2">行動領域</p>
             <div className="flex flex-wrap gap-4">
-              <Checkbox checked={report.action_career} onChange={(v) => set("action_career", v)} label="事業" disabled={existing} />
-              <Checkbox checked={report.action_wealth} onChange={(v) => set("action_wealth", v)} label="財富" disabled={existing} />
-              <Checkbox checked={report.action_health} onChange={(v) => set("action_health", v)} label="健康" disabled={existing} />
-              <Checkbox checked={report.action_family} onChange={(v) => set("action_family", v)} label="家庭" disabled={existing} />
-              <Checkbox checked={report.action_relationship} onChange={(v) => set("action_relationship", v)} label="關係" disabled={existing} />
+              <Checkbox checked={report.action_career} onChange={(v) => set("action_career", v)} label="事業" disabled={existing && !editing} />
+              <Checkbox checked={report.action_wealth} onChange={(v) => set("action_wealth", v)} label="財富" disabled={existing && !editing} />
+              <Checkbox checked={report.action_health} onChange={(v) => set("action_health", v)} label="健康" disabled={existing && !editing} />
+              <Checkbox checked={report.action_family} onChange={(v) => set("action_family", v)} label="家庭" disabled={existing && !editing} />
+              <Checkbox checked={report.action_relationship} onChange={(v) => set("action_relationship", v)} label="關係" disabled={existing && !editing} />
             </div>
           </div>
 
@@ -509,7 +524,7 @@ export default function DailyReportPage() {
               <Textarea
                 value={report.sharing_content}
                 onChange={(e) => set("sharing_content", e.target.value)}
-                disabled={existing}
+                disabled={existing && !editing}
                 rows={4}
                 className="mt-1 bg-background border-border"
               />
@@ -520,7 +535,7 @@ export default function DailyReportPage() {
               <Textarea
                 value={report.gratitude}
                 onChange={(e) => set("gratitude", e.target.value)}
-                disabled={existing}
+                disabled={existing && !editing}
                 rows={4}
                 className="mt-1 bg-background border-border"
               />
@@ -538,7 +553,7 @@ export default function DailyReportPage() {
                     type="range" min={1} max={10}
                     value={report.daily_score}
                     onChange={(e) => set("daily_score", parseInt(e.target.value))}
-                    disabled={existing}
+                    disabled={existing && !editing}
                     className="w-full mt-1 accent-gold"
                   />
                 </div>
@@ -550,7 +565,7 @@ export default function DailyReportPage() {
                         type="radio" name="compare"
                         checked={report.compare_yesterday === "better"}
                         onChange={() => set("compare_yesterday", "better")}
-                        disabled={existing}
+                        disabled={existing && !editing}
                         className="accent-gold"
                       />
                       <span className="text-sm">好</span>
@@ -560,7 +575,7 @@ export default function DailyReportPage() {
                         type="radio" name="compare"
                         checked={report.compare_yesterday === "worse"}
                         onChange={() => set("compare_yesterday", "worse")}
-                        disabled={existing}
+                        disabled={existing && !editing}
                         className="accent-gold"
                       />
                       <span className="text-sm">差</span>
@@ -572,7 +587,7 @@ export default function DailyReportPage() {
                   <Textarea
                     value={report.score_note}
                     onChange={(e) => set("score_note", e.target.value)}
-                    disabled={existing}
+                    disabled={existing && !editing}
                     rows={2}
                     className="mt-1 bg-background border-border"
                   />
@@ -585,7 +600,7 @@ export default function DailyReportPage() {
               <Textarea
                 value={report.tomorrow_action}
                 onChange={(e) => set("tomorrow_action", e.target.value)}
-                disabled={existing}
+                disabled={existing && !editing}
                 rows={6}
                 className="mt-1 bg-background border-border"
               />
@@ -598,7 +613,7 @@ export default function DailyReportPage() {
               checked={report.announced_in_group}
               onChange={(v) => set("announced_in_group", v)}
               label="是否已在群裡完成公佈？"
-              disabled={existing}
+              disabled={existing && !editing}
             />
           </div>
 
@@ -608,17 +623,38 @@ export default function DailyReportPage() {
             </p>
           )}
 
-          {!existing && (
+          {(!existing || editing) && (
             <Button
               type="submit"
               disabled={saving}
               className="w-full bg-gold text-black hover:bg-gold-light font-semibold h-12"
             >
-              {saving ? "儲存中..." : "提交今日日報"}
+              {saving ? "儲存中..." : editing ? "儲存修改" : "提交今日日報"}
             </Button>
           )}
 
-          {existing && (
+          {existing && !editing && (
+            <Button
+              type="button"
+              onClick={() => { setEditing(true); setMessage(""); }}
+              className="w-full bg-secondary text-foreground hover:bg-secondary/80 font-semibold h-12 mt-3"
+            >
+              修改今日日報
+            </Button>
+          )}
+
+          {editing && (
+            <Button
+              type="button"
+              onClick={() => { setEditing(false); setMessage(""); }}
+              variant="outline"
+              className="w-full mt-3"
+            >
+              取消修改
+            </Button>
+          )}
+
+          {existing && !editing && (
             <ReportPreview
               reportTitle="21天行動系統日報表"
               subtitle={`Day ${report.day_number}${planRound > 1 ? ` (第${planRound}輪)` : ""}`}

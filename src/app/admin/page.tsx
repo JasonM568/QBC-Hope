@@ -31,7 +31,7 @@ export default async function AdminPage() {
   return (
     <div className="min-h-screen">
       <Navbar userName={profile.display_name} userRole={viewerRole} />
-      <main className="max-w-4xl mx-auto px-4 py-8">
+      <main className="max-w-4xl mx-auto px-4 py-8 pb-24">
         <h1 className="text-2xl font-bold mb-6">
           {viewerRole === "admin" ? "管理員後台" : "管理後台"}
         </h1>

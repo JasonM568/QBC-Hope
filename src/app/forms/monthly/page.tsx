@@ -89,11 +89,11 @@ interface MonthlyForm {
 const emptyForm: MonthlyForm = {
   satisfaction: 5, monthly_keywords: "",
   last_career_score: 0, last_wealth_score: 0, last_health_score: 0, last_family_score: 0, last_relationship_score: 0,
-  career_value: "", career_achievement: "", career_stuck: "", career_score: 10, career_next: "",
-  wealth_income_change: "stable", wealth_new_source: "", wealth_investment: "", wealth_score: 10, wealth_next: "",
-  health_routine: "normal", health_status: "", health_exercise: "", health_score: 10, health_next: "",
-  family_complaint: false, family_complaint_reason: "", family_activity: "", family_interaction: "", family_score: 10, family_next: "",
-  relation_new_connection: false, relation_new_important: "", relation_interaction: "", relation_score: 10, relation_next: "",
+  career_value: "", career_achievement: "", career_stuck: "", career_score: 0, career_next: "",
+  wealth_income_change: "stable", wealth_new_source: "", wealth_investment: "", wealth_score: 0, wealth_next: "",
+  health_routine: "normal", health_status: "", health_exercise: "", health_score: 0, health_next: "",
+  family_complaint: false, family_complaint_reason: "", family_activity: "", family_interaction: "", family_score: 0, family_next: "",
+  relation_new_connection: false, relation_new_important: "", relation_interaction: "", relation_score: 0, relation_next: "",
   reflection_breakthrough: "", reflection_learning: "", reflection_mistake: "",
   balance_strongest: "", balance_weakest: "", balance_reason: "",
   next_three_things: "", next_domain_order: "", highlight: "", important_change: "", next_step: "",
@@ -135,7 +135,9 @@ export default function MonthlyReportPage() {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push("/auth/login"); return; }
-      setUserName(user.user_metadata?.display_name || user.email || "");
+
+      const { data: prof } = await supabase.from("profiles").select("display_name").eq("id", user.id).single();
+      setUserName(prof?.display_name || user.user_metadata?.display_name || user.email || "");
 
       const { data } = await supabase
         .from("monthly_reports")
@@ -277,15 +279,15 @@ export default function MonthlyReportPage() {
               <div>
                 <p className="text-sm text-muted-foreground mb-2">這個月分數</p>
                 {[
-                  { label: "事業 Career", score: form.career_score },
-                  { label: "財富 Wealth", score: form.wealth_score },
-                  { label: "健康 Health", score: form.health_score },
-                  { label: "家庭 Family", score: form.family_score },
-                  { label: "關係 Relation", score: form.relation_score },
+                  { label: "事業 Career", key: "career_score" as const },
+                  { label: "財富 Wealth", key: "wealth_score" as const },
+                  { label: "健康 Health", key: "health_score" as const },
+                  { label: "家庭 Family", key: "family_score" as const },
+                  { label: "關係 Relation", key: "relation_score" as const },
                 ].map((item) => (
-                  <div key={item.label} className="flex items-center justify-between py-1">
+                  <div key={item.key} className="flex items-center justify-between py-1">
                     <span className="text-sm">{item.label}</span>
-                    <span className="text-gold font-bold w-16 text-center">{item.score}</span>
+                    <Input type="number" min={0} max={20} value={form[item.key] || ""} onChange={(e) => setScore(item.key, e.target.value)} className="w-16 text-center bg-background border-border h-8 text-sm" />
                   </div>
                 ))}
                 <div className="flex items-center justify-between py-1 border-t border-border mt-1">
@@ -315,7 +317,7 @@ export default function MonthlyReportPage() {
             </div>
             <div className="flex items-center gap-4">
               <Label>評分 (1-20)：{form.career_score}</Label>
-              <input type="range" min={1} max={20} value={form.career_score} onChange={(e) => set("career_score", parseInt(e.target.value))} className="flex-1 accent-gold" />
+              <input type="range" min={0} max={20} value={form.career_score} onChange={(e) => set("career_score", parseInt(e.target.value))} className="flex-1 accent-gold" />
             </div>
             <div>
               <Label>下月優化方向</Label>
@@ -346,7 +348,7 @@ export default function MonthlyReportPage() {
             </div>
             <div className="flex items-center gap-4">
               <Label>評分 (1-20)：{form.wealth_score}</Label>
-              <input type="range" min={1} max={20} value={form.wealth_score} onChange={(e) => set("wealth_score", parseInt(e.target.value))} className="flex-1 accent-gold" />
+              <input type="range" min={0} max={20} value={form.wealth_score} onChange={(e) => set("wealth_score", parseInt(e.target.value))} className="flex-1 accent-gold" />
             </div>
             <div>
               <Label>下月優化方向</Label>
@@ -377,7 +379,7 @@ export default function MonthlyReportPage() {
             </div>
             <div className="flex items-center gap-4">
               <Label>評分 (1-20)：{form.health_score}</Label>
-              <input type="range" min={1} max={20} value={form.health_score} onChange={(e) => set("health_score", parseInt(e.target.value))} className="flex-1 accent-gold" />
+              <input type="range" min={0} max={20} value={form.health_score} onChange={(e) => set("health_score", parseInt(e.target.value))} className="flex-1 accent-gold" />
             </div>
             <div>
               <Label>下月優化方向</Label>
@@ -419,7 +421,7 @@ export default function MonthlyReportPage() {
             </div>
             <div className="flex items-center gap-4">
               <Label>評分 (1-20)：{form.family_score}</Label>
-              <input type="range" min={1} max={20} value={form.family_score} onChange={(e) => set("family_score", parseInt(e.target.value))} className="flex-1 accent-gold" />
+              <input type="range" min={0} max={20} value={form.family_score} onChange={(e) => set("family_score", parseInt(e.target.value))} className="flex-1 accent-gold" />
             </div>
             <div>
               <Label>下月優化方向</Label>
@@ -455,7 +457,7 @@ export default function MonthlyReportPage() {
             </div>
             <div className="flex items-center gap-4">
               <Label>評分 (1-20)：{form.relation_score}</Label>
-              <input type="range" min={1} max={20} value={form.relation_score} onChange={(e) => set("relation_score", parseInt(e.target.value))} className="flex-1 accent-gold" />
+              <input type="range" min={0} max={20} value={form.relation_score} onChange={(e) => set("relation_score", parseInt(e.target.value))} className="flex-1 accent-gold" />
             </div>
             <div>
               <Label>下月優化方向</Label>

@@ -49,15 +49,19 @@ export default function CommunityPage() {
       return;
     }
     setUserId(user.id);
-    setUserName(user.user_metadata?.display_name || user.email || "");
 
-    // 取得用戶角色
+    // 取得用戶角色與姓名
     const { data: profile } = await supabase
       .from("profiles")
-      .select("role")
+      .select("role, display_name")
       .eq("id", user.id)
       .single();
-    if (profile) setUserRole(profile.role);
+    if (profile) {
+      setUserRole(profile.role);
+      setUserName(profile.display_name || user.user_metadata?.display_name || user.email || "");
+    } else {
+      setUserName(user.user_metadata?.display_name || user.email || "");
+    }
 
     const { data } = await supabase
       .from("daily_checkins")
@@ -173,14 +177,20 @@ export default function CommunityPage() {
   }
 
   function timeAgo(dateStr: string) {
-    const diff = Date.now() - new Date(dateStr).getTime();
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
     const mins = Math.floor(diff / 60000);
     if (mins < 1) return "剛剛";
     if (mins < 60) return `${mins} 分鐘前`;
     const hours = Math.floor(mins / 60);
     if (hours < 24) return `${hours} 小時前`;
-    const days = Math.floor(hours / 24);
-    return `${days} 天前`;
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const d = String(date.getDate()).padStart(2, "0");
+    const h = String(date.getHours()).padStart(2, "0");
+    const min = String(date.getMinutes()).padStart(2, "0");
+    return `${y}/${m}/${d} ${h}:${min}`;
   }
 
   const roleLabel: Record<string, string> = {

@@ -3,21 +3,27 @@ import Navbar from "@/components/layout/navbar";
 import Link from "next/link";
 
 export default async function CoachNotesPage() {
-  const { user, profile, supabase } = await requireRole(["coach", "admin"]);
+  const { user, profile, supabase } = await requireRole(["coach", "admin", "master"]);
+  const isMaster = profile.role === "master" || profile.role === "admin";
 
-  const { data: notes } = await supabase
+  const notesQuery = supabase
     .from("coach_notes")
     .select(`
-      id, content, note_type, created_at, student_id,
+      id, content, note_type, created_at, student_id, coach_id,
       profiles!coach_notes_student_id_fkey(display_name)
     `)
-    .eq("coach_id", user.id)
     .order("created_at", { ascending: false })
     .limit(50);
 
+  if (!isMaster) {
+    notesQuery.eq("coach_id", user.id);
+  }
+
+  const { data: notes } = await notesQuery;
+
   return (
     <div className="min-h-screen">
-      <Navbar userName={profile.display_name} />
+      <Navbar userName={profile.display_name} userRole={profile.role} />
       <main className="max-w-3xl mx-auto px-4 py-8">
         <div className="mb-6">
           <Link href="/coach" className="text-sm text-muted-foreground hover:text-gold transition-colors">
