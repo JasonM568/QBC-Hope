@@ -36,12 +36,20 @@ export default function AdminPanel({
   currentUserId,
   viewerRole,
   deletionRequests,
+  todayDate,
+  totalStudents,
+  reportedCount,
+  reportedTodayIds,
 }: {
   users: User[];
   coaches: User[];
   currentUserId: string;
   viewerRole: string;
   deletionRequests: DeletionRequest[];
+  todayDate: string;
+  totalStudents: number;
+  reportedCount: number;
+  reportedTodayIds: string[];
 }) {
   const [updating, setUpdating] = useState<string | null>(null);
   const [editingUser, setEditingUser] = useState<string | null>(null);
@@ -410,6 +418,40 @@ export default function AdminPanel({
             {users.filter((u) => u.role === "student").length}
           </p>
         </div>
+      </div>
+
+      {/* Daily Report Stats */}
+      <div className="mb-8 p-6 rounded-xl border border-border bg-card">
+        <h2 className="text-lg font-semibold mb-4">今日日報繳交狀況（{todayDate}）</h2>
+        <div className="grid grid-cols-3 gap-4 mb-4">
+          <div className="text-center">
+            <p className="text-muted-foreground text-sm">總學員</p>
+            <p className="text-2xl font-bold text-gold">{totalStudents}</p>
+          </div>
+          <div className="text-center">
+            <p className="text-muted-foreground text-sm">已繳交</p>
+            <p className="text-2xl font-bold text-green-400">{reportedCount}</p>
+          </div>
+          <div className="text-center">
+            <p className="text-muted-foreground text-sm">未繳交</p>
+            <p className="text-2xl font-bold text-red-400">{totalStudents - reportedCount}</p>
+          </div>
+        </div>
+        {totalStudents - reportedCount > 0 && (
+          <div>
+            <p className="text-sm text-muted-foreground mb-2">未繳交學員：</p>
+            <p className="text-sm">
+              {users
+                .filter((u) => u.role === "student" && !reportedTodayIds.includes(u.id))
+                .map((u) => u.display_name || "未設定名稱")
+                .sort()
+                .join("、")}
+            </p>
+          </div>
+        )}
+        {totalStudents > 0 && reportedCount === totalStudents && (
+          <p className="text-green-400 font-medium text-center">🎉 今天全員都已繳交！</p>
+        )}
       </div>
 
       {/* Pending Deletion Requests (Admin only) */}

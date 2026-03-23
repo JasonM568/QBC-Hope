@@ -1,4 +1,5 @@
 import { requireRole } from "@/lib/auth-guard";
+import { createServiceRoleClient } from "@/lib/supabase/server";
 import Navbar from "@/components/layout/navbar";
 import CoachList from "./coach-list";
 
@@ -20,14 +21,19 @@ export default async function CoachDashboard() {
 
   const { data: students } = await studentsQuery;
 
-  // Get today's date
-  const today = new Date().toISOString().split("T")[0];
+  // Get today's date (Taiwan time UTC+8)
+  const now = new Date();
+  const taiwanDate = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+  const today = taiwanDate.toISOString().split("T")[0];
+
+  // Use service role client for report queries to bypass RLS
+  const reportClient = isMaster ? createServiceRoleClient() : supabase;
 
   // Get today's report status for each student
   const studentIds = students?.map((s) => s.id) || [];
 
   const { data: todayReports } = studentIds.length > 0
-    ? await supabase
+    ? await reportClient
         .from("daily_reports")
         .select("user_id")
         .in("user_id", studentIds)
@@ -38,7 +44,7 @@ export default async function CoachDashboard() {
 
   // Get total report counts per student
   const { data: reportCounts } = studentIds.length > 0
-    ? await supabase
+    ? await reportClient
         .from("daily_reports")
         .select("user_id")
         .in("user_id", studentIds)

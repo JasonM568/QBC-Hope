@@ -1,4 +1,5 @@
 import { requireRole } from "@/lib/auth-guard";
+import { createServiceRoleClient } from "@/lib/supabase/server";
 import Navbar from "@/components/layout/navbar";
 import AdminPanel from "./admin-panel";
 
@@ -21,6 +22,26 @@ export default async function AdminPage() {
 
   const coaches = users?.filter((u) => u.role === "coach" || u.role === "admin" || u.role === "master") || [];
 
+  // Get today's daily report stats (Taiwan time UTC+8)
+  const now = new Date();
+  const taiwanDate = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+  const today = taiwanDate.toISOString().split("T")[0];
+
+  const allStudents = users?.filter((u) => u.role === "student") || [];
+  const studentIds = allStudents.map((s) => s.id);
+
+  const serviceClient = createServiceRoleClient();
+
+  const { data: todayReports } = studentIds.length > 0
+    ? await serviceClient
+        .from("daily_reports")
+        .select("user_id")
+        .in("user_id", studentIds)
+        .eq("report_date", today)
+    : { data: [] };
+
+  const reportedTodaySet = new Set(todayReports?.map((r) => r.user_id) || []);
+
   // Load pending deletion requests (admin sees all, master sees own)
   const { data: deletionRequests } = await supabase
     .from("deletion_requests")
@@ -41,6 +62,10 @@ export default async function AdminPage() {
           currentUserId={user.id}
           viewerRole={viewerRole}
           deletionRequests={deletionRequests || []}
+          todayDate={today}
+          totalStudents={allStudents.length}
+          reportedCount={reportedTodaySet.size}
+          reportedTodayIds={Array.from(reportedTodaySet)}
         />
       </main>
     </div>
