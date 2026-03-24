@@ -127,6 +127,52 @@ export default async function CoachDashboard() {
           </div>
         </div>
 
+        {/* Daily Report Detail */}
+        <div className="mb-8 p-6 rounded-xl border border-border bg-card">
+          <h2 className="text-lg font-semibold mb-4">今日日報繳交狀況（{today}）</h2>
+          <div className="grid grid-cols-3 gap-4 mb-4">
+            <div className="text-center">
+              <p className="text-muted-foreground text-sm">總學員</p>
+              <p className="text-2xl font-bold text-gold">{students?.length || 0}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-muted-foreground text-sm">已繳交</p>
+              <p className="text-2xl font-bold text-green-400">{reportedToday.size}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-muted-foreground text-sm">未繳交</p>
+              <p className="text-2xl font-bold text-red-400">{(students?.length || 0) - reportedToday.size}</p>
+            </div>
+          </div>
+          {reportedToday.size > 0 && reportedToday.size < (students?.length || 0) && (
+            <div className="space-y-3">
+              <div>
+                <p className="text-sm text-green-400 font-medium mb-1">✅ 已繳交（{reportedToday.size} 人）</p>
+                <p className="text-sm text-foreground/80">
+                  {students?.filter((s) => reportedToday.has(s.id)).map((s) => s.display_name || "未設定名稱").sort().join("、")}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-red-400 font-medium mb-1">❌ 未繳交（{(students?.length || 0) - reportedToday.size} 人）</p>
+                <p className="text-sm text-foreground/80">
+                  {students?.filter((s) => !reportedToday.has(s.id)).map((s) => s.display_name || "未設定名稱").sort().join("、")}
+                </p>
+              </div>
+            </div>
+          )}
+          {reportedToday.size === (students?.length || 0) && (students?.length || 0) > 0 && (
+            <p className="text-green-400 font-medium text-center">🎉 今天全員都已繳交！</p>
+          )}
+          {reportedToday.size === 0 && (students?.length || 0) > 0 && (
+            <div>
+              <p className="text-sm text-red-400 font-medium mb-1">❌ 未繳交（{students?.length || 0} 人）</p>
+              <p className="text-sm text-foreground/80">
+                {students?.map((s) => s.display_name || "未設定名稱").sort().join("、")}
+              </p>
+            </div>
+          )}
+        </div>
+
         <CoachList
           students={students || []}
           coachList={coachList}
