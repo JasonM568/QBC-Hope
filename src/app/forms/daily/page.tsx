@@ -130,6 +130,8 @@ export default function DailyReportPage() {
   const [today, setToday] = useState("");
   const [selectedDate, setSelectedDate] = useState("");
   const [showBackfill, setShowBackfill] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [pastReports, setPastReports] = useState<{ report_date: string; day_number: number; energy_state: number; daily_score: number }[]>([]);
   const router = useRouter();
 
   const set = <K extends keyof DailyReport>(key: K, value: DailyReport[K]) =>
@@ -137,11 +139,14 @@ export default function DailyReportPage() {
 
   const activeDate = selectedDate || today;
 
-  // 計算指定日期是第幾天
+  // 計算指定日期是第幾天（使用純日期字串避免時區問題）
   function calcDayNumber(startDate: string, round: number, forDate?: string): number {
-    const start = new Date(startDate);
-    const target = new Date(forDate || today);
-    const diff = Math.floor((target.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+    const todayStr = forDate || today || new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" });
+    const [sy, sm, sd] = startDate.split("-").map(Number);
+    const [ty, tm, td] = todayStr.split("-").map(Number);
+    const startMs = Date.UTC(sy, sm - 1, sd);
+    const targetMs = Date.UTC(ty, tm - 1, td);
+    const diff = Math.floor((targetMs - startMs) / (1000 * 60 * 60 * 24));
     return diff - (round - 1) * 21 + 1;
   }
 
@@ -171,7 +176,14 @@ export default function DailyReportPage() {
       .maybeSingle();
 
     if (data) {
-      setReport({ ...emptyReport, ...data });
+      const correctDayNum = planStartDate
+        ? calcDayNumber(planStartDate, planRound, newDate)
+        : data.day_number;
+      setReport({
+        ...emptyReport,
+        ...data,
+        day_number: correctDayNum > 0 ? correctDayNum : data.day_number,
+      });
       setExisting(true);
     }
     setLoading(false);
@@ -199,7 +211,7 @@ export default function DailyReportPage() {
         setPlanStartDate(profile.plan_start_date);
         const round = profile.plan_round || 1;
         setPlanRound(round);
-        const dayNum = calcDayNumber(profile.plan_start_date, round);
+        const dayNum = calcDayNumber(profile.plan_start_date, round, clientToday);
         setReport((prev) => ({ ...prev, day_number: dayNum > 0 ? dayNum : 1 }));
       }
 
@@ -211,12 +223,24 @@ export default function DailyReportPage() {
         .maybeSingle();
 
       if (data) {
+        const correctDayNum = profile?.plan_start_date
+          ? calcDayNumber(profile.plan_start_date, profile?.plan_round || 1, clientToday)
+          : data.day_number;
         setReport({
           ...emptyReport,
           ...data,
+          day_number: correctDayNum > 0 ? correctDayNum : data.day_number,
         });
         setExisting(true);
       }
+
+      // 載入所有歷史日報
+      const { data: history } = await supabase
+        .from("daily_reports")
+        .select("report_date, day_number, energy_state, daily_score")
+        .eq("user_id", user.id)
+        .order("report_date", { ascending: false });
+      if (history) setPastReports(history);
       setLoading(false);
     }
     load();
@@ -327,6 +351,15 @@ export default function DailyReportPage() {
         setExisting(true);
       }
     }
+
+    // 儲存後重新載入歷史列表
+    const { data: history } = await supabase
+      .from("daily_reports")
+      .select("report_date, day_number, energy_state, daily_score")
+      .eq("user_id", user.id)
+      .order("report_date", { ascending: false });
+    if (history) setPastReports(history);
+
     setSaving(false);
   }
 
@@ -864,6 +897,57 @@ export default function DailyReportPage() {
             />
           )}
         </form>
+
+        {/* 歷史日報紀錄 */}
+        {pastReports.length > 0 && (
+          <div className="mt-8 mb-8">
+            <button
+              type="button"
+              onClick={() => setShowHistory(!showHistory)}
+              className="w-full flex items-center justify-between p-4 rounded-xl border border-border bg-card hover:bg-card/80 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-gold font-semibold">歷史日報紀錄</span>
+                <span className="text-xs text-muted-foreground">共 {pastReports.length} 篇</span>
+              </div>
+              <span className="text-muted-foreground text-sm">{showHistory ? "收起" : "展開"}</span>
+            </button>
+
+            {showHistory && (
+              <div className="mt-2 space-y-2">
+                {pastReports.map((r) => (
+                  <button
+                    key={r.report_date}
+                    type="button"
+                    onClick={() => {
+                      if (r.report_date === today) {
+                        setSelectedDate("");
+                      } else {
+                        switchDate(r.report_date);
+                      }
+                      setShowHistory(false);
+                      window.scrollTo({ top: 0, behavior: "smooth" });
+                    }}
+                    className={`w-full flex items-center justify-between p-3 rounded-lg border transition-colors text-left ${
+                      activeDate === r.report_date
+                        ? "border-gold bg-gold/10"
+                        : "border-border bg-card hover:bg-card/80"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-medium">{r.report_date}</span>
+                      <span className="text-xs text-gold">Day {r.day_number}</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                      <span>能量 {r.energy_state}/10</span>
+                      <span>評分 {r.daily_score}/10</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </main>
     </div>
   );

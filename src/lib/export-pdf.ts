@@ -192,12 +192,26 @@ export async function exportDailyPDF(data: DailyPDFData) {
   const doc = new jsPDF("p", "mm", "a4");
   await loadChineseFont(doc);
 
-  const pw = doc.internal.pageSize.getWidth(); // 210
-  const m = 12; // margin
-  const w = pw - m * 2; // content width
-  let y = 0;
+  const pw = 210; // A4 width
+  const ph = 297; // A4 height
+  const m = 12;   // margin
+  const w = pw - m * 2;
+  const halfW = w / 2;
+  const lineH = 4.5;   // 9pt 行高
+  const cellPad = 3;    // 格內邊距
+  const titleBarH = 7;  // 標題列高度
+  const textW = halfW - cellPad * 2; // 格內文字寬度
 
-  // --- 頂部標題列 ---
+  const gray = (v: number) => doc.setTextColor(v, v, v);
+  const gold = () => doc.setTextColor(212, 175, 55);
+
+  // helper: 量測文字換行後行數
+  function measure(text: string, maxW?: number): string[] {
+    doc.setFontSize(9);
+    return doc.splitTextToSize(text || "", maxW || textW);
+  }
+
+  // ========== 頂部標題列（固定 22mm）==========
   doc.setFillColor(10, 10, 10);
   doc.rect(0, 0, pw, 22, "F");
   doc.setFillColor(212, 175, 55);
@@ -214,7 +228,6 @@ export async function exportDailyPDF(data: DailyPDFData) {
   doc.setFontSize(14);
   doc.text("21天行動系統日報表", m, 18);
 
-  // 姓名 + 日期
   doc.setFontSize(11);
   doc.setTextColor(237, 237, 239);
   const roundText = data.planRound ? `第${data.planRound}輪` : "";
@@ -223,29 +236,94 @@ export async function exportDailyPDF(data: DailyPDFData) {
   doc.setTextColor(180, 180, 180);
   doc.text(data.date, pw - m, 18, { align: "right" });
 
-  y = 26;
+  // ========== 基本資訊列（固定 10mm）==========
+  const infoY = 26;
+  const infoH = 10;
+  doc.setDrawColor(220, 220, 220);
+  doc.rect(m, infoY, w * 0.25, infoH);
+  doc.rect(m + w * 0.25, infoY, w * 0.2, infoH);
+  doc.rect(m + w * 0.45, infoY, w * 0.55, infoH);
 
-  const gray = (v: number) => doc.setTextColor(v, v, v);
-  const gold = () => doc.setTextColor(212, 175, 55);
-  const drawBox = (x: number, by: number, bw: number, bh: number) => {
-    doc.setDrawColor(220, 220, 220);
-    doc.rect(x, by, bw, bh);
-  };
+  doc.setFontSize(8); gray(120);
+  doc.text("日期", m + 2, infoY + 3.5);
+  doc.text("能量狀態", m + w * 0.25 + 2, infoY + 3.5);
+  doc.text("今天最重要的一件事", m + w * 0.45 + 2, infoY + 3.5);
 
-  // helper: section title bar — 10pt
-  function sectionTitle(title: string, x: number, sy: number, sw: number) {
+  doc.setFontSize(10); gray(30);
+  doc.text(data.date, m + 2, infoY + 8);
+  gold();
+  doc.text(`${data.energyState} / 10`, m + w * 0.25 + 2, infoY + 8);
+  doc.setFontSize(9); gray(30);
+  const mitLines = measure(data.mostImportantThing, w * 0.55 - 4);
+  doc.text(mitLines, m + w * 0.45 + 2, infoY + 8);
+
+  // ========== 計算各區塊所需高度 ==========
+  const checksRowH = 9;  // 勾選項兩排所需高度
+  const labelH = 4.5;    // 子標題行高
+  const scoreRowH = 5.5; // 評分行高
+
+  // PART 1: 勾選項 + 自我宣言標題 + 宣言文字
+  const declLines = measure(data.selfDeclaration);
+  const need1 = checksRowH + labelH + declLines.length * lineH;
+
+  // PART 2: 可以更好的地方標題 + 文字 + 覺察到什麼標題 + 文字
+  const impLines = measure(data.awarenessImprove);
+  const notLines = measure(data.awarenessNotice);
+  const need2 = labelH + impLines.length * lineH + labelH + notLines.length * lineH;
+
+  // PART 3: 學習內容 + 來源標題 + 勾選
+  const learnLines = measure(data.learningContent);
+  const need3 = learnLines.length * lineH + labelH + 5;
+
+  // PART 4: 行動內容 + 領域標題 + 勾選
+  const actLines = measure(data.actionContent);
+  const need4 = actLines.length * lineH + labelH + 5;
+
+  // PART 5: 分享內容
+  const shareLines = measure(data.sharingContent);
+  const need5 = shareLines.length * lineH;
+
+  // PART 6: 感恩內容
+  const gratLines = measure(data.gratitude);
+  const need6 = gratLines.length * lineH;
+
+  // PART 7: 評分 + 比昨天 + 自評說明標題 + 說明文字
+  const scoreLines = measure(data.scoreNote);
+  const need7 = scoreRowH + labelH + scoreLines.length * lineH;
+
+  // PART 8: 明日行動文字
+  const tmrwLines = measure(data.tomorrowAction);
+  const need8 = tmrwLines.length * lineH;
+
+  // 每列取左右最大值（加上格內邊距）
+  const pad2 = cellPad * 2;
+  const rowNeed1 = Math.max(need1, need2) + pad2;
+  const rowNeed2 = Math.max(need3, need4) + pad2;
+  const rowNeed3 = Math.max(need5, need6) + pad2;
+  const rowNeed4 = Math.max(need7, need8) + pad2;
+
+  const totalNeed = rowNeed1 + rowNeed2 + rowNeed3 + rowNeed4;
+  const fixedH = 22 + 0.8 + infoH + 4 * titleBarH + 7 + 13; // header + info + titles + announce + footer
+  const availableH = ph - fixedH - (infoY - 22); // 扣除所有固定區域
+  const extraPerRow = totalNeed < availableH ? (availableH - totalNeed) / 4 : 0;
+
+  const rowH1 = rowNeed1 + extraPerRow;
+  const rowH2 = rowNeed2 + extraPerRow;
+  const rowH3 = rowNeed3 + extraPerRow;
+  const rowH4 = rowNeed4 + extraPerRow;
+
+  // ========== 繪製 helpers ==========
+  function drawTitleBar(title: string, x: number, ty: number, sw: number) {
     doc.setFillColor(212, 175, 55);
-    doc.rect(x, sy, sw, 7, "F");
+    doc.rect(x, ty, sw, titleBarH, "F");
     doc.setFontSize(10);
     doc.setTextColor(10, 10, 10);
-    doc.text(title, x + 2, sy + 5);
-    return sy + 7;
+    doc.text(title, x + 2, ty + 5);
   }
 
-  // helper: 勾選項 (compact) — 9pt
   function drawChecks(items: { label: string; checked: boolean }[], x: number, cy: number, colWidth: number) {
     doc.setFontSize(9);
-    let cx = x + 2;
+    let cx = x + cellPad;
     for (const item of items) {
       gray(item.checked ? 50 : 160);
       doc.text((item.checked ? "[v] " : "[  ] ") + item.label, cx, cy);
@@ -253,131 +331,134 @@ export async function exportDailyPDF(data: DailyPDFData) {
     }
   }
 
-  // ---- 基本資訊列 ----
-  const infoH = 10;
-  drawBox(m, y, w * 0.25, infoH);
-  drawBox(m + w * 0.25, y, w * 0.25, infoH);
-  drawBox(m + w * 0.5, y, w * 0.5, infoH);
+  // ========== 繪製 4 列 ==========
+  let y = infoY + infoH;
 
+  // --- 列 1: PART 1 + PART 2 ---
+  drawTitleBar("PART 1 晨間信念打卡", m, y, halfW);
+  drawTitleBar("PART 2 今日覺察", m + halfW, y, halfW);
+  y += titleBarH;
+  const r1 = y;
+
+  doc.setDrawColor(220, 220, 220);
+  doc.rect(m, r1, halfW, rowH1);
+  doc.rect(m + halfW, r1, halfW, rowH1);
+
+  // PART 1 內容
+  let cy = r1 + cellPad;
+  drawChecks(data.beliefs.slice(0, 3), m, cy + 3, halfW / 3);
+  drawChecks(data.beliefs.slice(3), m, cy + 7, halfW / 2);
+  cy += checksRowH;
   doc.setFontSize(8); gray(120);
-  doc.text("日期", m + 2, y + 3.5);
-  doc.text("能量狀態", m + w * 0.25 + 2, y + 3.5);
-  doc.text("今天最重要的一件事", m + w * 0.5 + 2, y + 3.5);
+  doc.text("自我宣言", m + cellPad, cy + 3);
+  cy += labelH;
+  doc.setFontSize(9); gray(50);
+  doc.text(declLines, m + cellPad, cy + 3);
 
-  doc.setFontSize(10); gray(30);
-  doc.text(data.date, m + 2, y + 8);
-  gold();
-  doc.text(`${data.energyState} / 10`, m + w * 0.25 + 2, y + 8);
-  doc.setFontSize(9); gray(30);
-  const mitLines = doc.splitTextToSize(data.mostImportantThing || "", w * 0.5 - 4);
-  doc.text(mitLines.slice(0, 1), m + w * 0.5 + 2, y + 8);
-
-  y += infoH;
-
-  // ---- PART 1 晨間信念打卡 ----
-  const p1H = 18;
-  const halfW = w / 2;
-
-  y = sectionTitle("PART 1 晨間信念打卡", m, y, halfW);
-  const p1Top = y;
-  drawBox(m, y, halfW, p1H);
-  drawChecks(data.beliefs.slice(0, 3), m, y + 4, halfW / 3);
-  drawChecks(data.beliefs.slice(3), m, y + 8, halfW / 2);
+  // PART 2 內容
+  cy = r1 + cellPad;
   doc.setFontSize(8); gray(120);
-  doc.text("自我宣言", m + 2, y + 12);
+  doc.text("可以更好的地方", m + halfW + cellPad, cy + 3);
+  cy += labelH;
   doc.setFontSize(9); gray(50);
-  const declLines = doc.splitTextToSize(data.selfDeclaration || "", halfW - 4);
-  doc.text(declLines.slice(0, 1), m + 2, y + 15.5);
-
-  // ---- PART 2 今日覺察 (右半) ----
-  sectionTitle("PART 2 今日覺察", m + halfW, p1Top - 7, halfW);
-  drawBox(m + halfW, p1Top, halfW, p1H);
+  doc.text(impLines, m + halfW + cellPad, cy + 3);
+  cy += impLines.length * lineH;
   doc.setFontSize(8); gray(120);
-  doc.text("可以更好的地方", m + halfW + 2, p1Top + 3.5);
+  doc.text("覺察到什麼", m + halfW + cellPad, cy + 3);
+  cy += labelH;
   doc.setFontSize(9); gray(50);
-  const aw1 = doc.splitTextToSize(data.awarenessImprove || "", halfW - 4);
-  doc.text(aw1.slice(0, 2), m + halfW + 2, p1Top + 7);
+  doc.text(notLines, m + halfW + cellPad, cy + 3);
+
+  y = r1 + rowH1;
+
+  // --- 列 2: PART 3 + PART 4 ---
+  drawTitleBar("PART 3 今日學習", m, y, halfW);
+  drawTitleBar("PART 4 今日行動", m + halfW, y, halfW);
+  y += titleBarH;
+  const r2 = y;
+
+  doc.setDrawColor(220, 220, 220);
+  doc.rect(m, r2, halfW, rowH2);
+  doc.rect(m + halfW, r2, halfW, rowH2);
+
+  // PART 3 內容
+  cy = r2 + cellPad;
+  doc.setFontSize(9); gray(50);
+  doc.text(learnLines, m + cellPad, cy + 3);
+  cy += learnLines.length * lineH;
   doc.setFontSize(8); gray(120);
-  doc.text("覺察到什麼", m + halfW + 2, p1Top + 12.5);
-  doc.setFontSize(9); gray(50);
-  const aw2 = doc.splitTextToSize(data.awarenessNotice || "", halfW - 4);
-  doc.text(aw2.slice(0, 1), m + halfW + 2, p1Top + 16);
+  doc.text("來源", m + cellPad, cy + 3);
+  cy += labelH;
+  drawChecks(data.learningSources, m, cy + 2, (halfW - cellPad * 2) / 5);
 
-  y = p1Top + p1H;
-
-  // ---- PART 3 今日學習 + PART 4 今日行動 ----
-  const p3H = 18;
-  y = sectionTitle("PART 3 今日學習", m, y, halfW);
-  const p3Top = y;
-  drawBox(m, y, halfW, p3H);
+  // PART 4 內容
+  cy = r2 + cellPad;
   doc.setFontSize(9); gray(50);
-  const lcLines = doc.splitTextToSize(data.learningContent || "", halfW - 4);
-  doc.text(lcLines.slice(0, 2), m + 2, y + 4);
+  doc.text(actLines, m + halfW + cellPad, cy + 3);
+  cy += actLines.length * lineH;
   doc.setFontSize(8); gray(120);
-  doc.text("來源", m + 2, y + 11);
-  drawChecks(data.learningSources, m, y + 14.5, (halfW - 4) / 5);
+  doc.text("領域", m + halfW + cellPad, cy + 3);
+  cy += labelH;
+  drawChecks(data.actionDomains, m + halfW, cy + 2, (halfW - cellPad * 2) / 5);
 
-  sectionTitle("PART 4 今日行動", m + halfW, p3Top - 7, halfW);
-  drawBox(m + halfW, p3Top, halfW, p3H);
+  y = r2 + rowH2;
+
+  // --- 列 3: PART 5 + PART 6 ---
+  drawTitleBar("PART 5 今日分享", m, y, halfW);
+  drawTitleBar("PART 6 感恩時刻", m + halfW, y, halfW);
+  y += titleBarH;
+  const r3 = y;
+
+  doc.setDrawColor(220, 220, 220);
+  doc.rect(m, r3, halfW, rowH3);
+  doc.rect(m + halfW, r3, halfW, rowH3);
+
   doc.setFontSize(9); gray(50);
-  const acLines = doc.splitTextToSize(data.actionContent || "", halfW - 4);
-  doc.text(acLines.slice(0, 2), m + halfW + 2, p3Top + 4);
-  doc.setFontSize(8); gray(120);
-  doc.text("領域", m + halfW + 2, p3Top + 11);
-  drawChecks(data.actionDomains, m + halfW, p3Top + 14.5, (halfW - 4) / 5);
+  doc.text(shareLines, m + cellPad, r3 + cellPad + 3);
+  doc.text(gratLines, m + halfW + cellPad, r3 + cellPad + 3);
 
-  y = p3Top + p3H;
+  y = r3 + rowH3;
 
-  // ---- PART 5 今日分享 + PART 6 感恩時刻 ----
-  const p5H = 16;
-  y = sectionTitle("PART 5 今日分享", m, y, halfW);
-  const p5Top = y;
-  drawBox(m, y, halfW, p5H);
-  doc.setFontSize(9); gray(50);
-  const shLines = doc.splitTextToSize(data.sharingContent || "", halfW - 4);
-  doc.text(shLines.slice(0, 3), m + 2, y + 4);
+  // --- 列 4: PART 7 + PART 8 ---
+  drawTitleBar("PART 7 今日評分", m, y, halfW);
+  drawTitleBar("PART 8 明日行動", m + halfW, y, halfW);
+  y += titleBarH;
+  const r4 = y;
 
-  sectionTitle("PART 6 感恩時刻", m + halfW, p5Top - 7, halfW);
-  drawBox(m + halfW, p5Top, halfW, p5H);
-  doc.setFontSize(9); gray(50);
-  const grLines = doc.splitTextToSize(data.gratitude || "", halfW - 4);
-  doc.text(grLines.slice(0, 3), m + halfW + 2, p5Top + 4);
+  doc.setDrawColor(220, 220, 220);
+  doc.rect(m, r4, halfW, rowH4);
+  doc.rect(m + halfW, r4, halfW, rowH4);
 
-  y = p5Top + p5H;
-
-  // ---- PART 7 今日評分 + PART 8 明日行動 ----
-  const p7H = 18;
-  y = sectionTitle("PART 7 今日評分", m, y, halfW);
-  const p7Top = y;
-  drawBox(m, y, halfW, p7H);
+  // PART 7 內容
+  cy = r4 + cellPad;
   doc.setFontSize(10); gold();
-  doc.text(`${data.dailyScore} / 10`, m + 2, y + 5);
+  doc.text(`${data.dailyScore} / 10`, m + cellPad, cy + 3);
   doc.setFontSize(9); gray(80);
-  doc.text(`比昨天：${data.compareYesterday === "better" ? "好" : data.compareYesterday === "worse" ? "差" : "—"}`, m + 22, y + 5);
+  const compareLabel = data.compareYesterday === "better" ? "比昨天好" : data.compareYesterday === "worse" ? "比昨天差" : "";
+  if (compareLabel) doc.text(compareLabel, m + 22, cy + 3);
+  cy += scoreRowH;
   doc.setFontSize(8); gray(120);
-  doc.text("自評說明", m + 2, y + 9.5);
+  doc.text("自評說明", m + cellPad, cy + 3);
+  cy += labelH;
   doc.setFontSize(9); gray(50);
-  const snLines = doc.splitTextToSize(data.scoreNote || "", halfW - 4);
-  doc.text(snLines.slice(0, 2), m + 2, y + 13);
+  doc.text(scoreLines, m + cellPad, cy + 3);
 
-  sectionTitle("PART 8 明日行動", m + halfW, p7Top - 7, halfW);
-  drawBox(m + halfW, p7Top, halfW, p7H);
+  // PART 8 內容
   doc.setFontSize(9); gray(50);
-  const tmLines = doc.splitTextToSize(data.tomorrowAction || "", halfW - 4);
-  doc.text(tmLines.slice(0, 4), m + halfW + 2, p7Top + 4);
+  doc.text(tmrwLines, m + halfW + cellPad, r4 + cellPad + 3);
 
-  y = p7Top + p7H;
+  y = r4 + rowH4;
 
-  // ---- 群組公佈 ----
+  // ========== 群組公佈 ==========
   y += 2;
   doc.setFontSize(9);
   gray(data.announcedInGroup ? 50 : 160);
   doc.text((data.announcedInGroup ? "[v]" : "[  ]") + " 已在群裡完成公佈", m + 2, y + 3);
 
-  // ---- Footer — 12pt gold ----
+  // ========== Footer ==========
   doc.setFontSize(12);
   doc.setTextColor(212, 175, 55);
-  doc.text("HOPE 人生作業系統", pw / 2, 287, { align: "center" });
+  doc.text("HOPE 人生作業系統", pw / 2, ph - 10, { align: "center" });
 
   doc.save(`HOPE_日報表_Day${data.dayNumber}_${data.date}.pdf`);
 }
