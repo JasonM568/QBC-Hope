@@ -39,7 +39,7 @@ export default function CommunityPage() {
   const [replyPosting, setReplyPosting] = useState(false);
   const router = useRouter();
 
-  const canReply = userRole === "coach" || userRole === "admin" || userRole === "master";
+  const canReply = userRole === "coach" || userRole === "admin" || userRole === "master" || userRole === "tester";
 
   const loadCheckins = useCallback(async () => {
     const supabase = createClient();
@@ -196,13 +196,15 @@ export default function CommunityPage() {
   const roleLabel: Record<string, string> = {
     coach: "教練",
     admin: "管理員",
-    master: "Master",
+    master: "總教練",
+    tester: "測試人員",
   };
 
   const roleBadgeColor: Record<string, string> = {
     coach: "bg-gold/10 text-gold",
     admin: "bg-purple-400/10 text-purple-400",
     master: "bg-emerald-400/10 text-emerald-400",
+    tester: "bg-orange-400/10 text-orange-400",
   };
 
   return (

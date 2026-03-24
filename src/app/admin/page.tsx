@@ -4,7 +4,7 @@ import Navbar from "@/components/layout/navbar";
 import AdminPanel from "./admin-panel";
 
 export default async function AdminPage() {
-  const { user, profile, supabase } = await requireRole(["admin", "master"]);
+  const { user, profile, supabase } = await requireRole(["admin", "master", "tester"]);
 
   const viewerRole = profile.role as string;
 

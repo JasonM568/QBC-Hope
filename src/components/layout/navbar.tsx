@@ -45,8 +45,8 @@ export default function Navbar({ userName, userRole }: { userName?: string; user
     loadRole();
   }, [userRole]);
 
-  const isCoachOrAbove = role === "coach" || role === "admin" || role === "master";
-  const isAdminOrMaster = role === "admin" || role === "master";
+  const isCoachOrAbove = role === "coach" || role === "admin" || role === "master" || role === "tester";
+  const isAdminOrMaster = role === "admin" || role === "master" || role === "tester";
   const isOnCoachPage = pathname.startsWith("/coach") || pathname.startsWith("/admin");
 
   const navItems = isOnCoachPage && isCoachOrAbove

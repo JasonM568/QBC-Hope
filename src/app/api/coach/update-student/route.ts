@@ -18,7 +18,7 @@ export async function POST(request: Request) {
     .eq("id", user.id)
     .single();
 
-  if (!profile || !["coach", "admin", "master"].includes(profile.role)) {
+  if (!profile || !["coach", "admin", "master", "tester"].includes(profile.role)) {
     return NextResponse.json({ error: "無權限" }, { status: 403 });
   }
 

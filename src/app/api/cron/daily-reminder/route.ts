@@ -38,13 +38,20 @@ export async function GET(request: Request) {
   const today = adjustedDate.toISOString().split("T")[0];
   const checkTime = `${today.replace(/-/g, "/")} 22:30`;
 
-  // Get all active students
-  const { data: students } = await supabase
+  // Excluded accounts (admin/tester)
+  const EXCLUDED_EMAILS = ["306465@gmail.com", "chief@huibang.com.tw"];
+
+  // Get all active students (exclude test accounts)
+  const { data: rawStudents } = await supabase
     .from("profiles")
-    .select("id, display_name")
+    .select("id, display_name, email")
     .eq("role", "student");
 
-  if (!students || students.length === 0) {
+  const students = (rawStudents || []).filter(
+    (s: { email: string }) => !EXCLUDED_EMAILS.includes(s.email)
+  );
+
+  if (students.length === 0) {
     return NextResponse.json({ message: "No students found" });
   }
 

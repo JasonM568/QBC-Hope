@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     .eq("id", userId)
     .single();
 
-  if (!profile || !["admin", "master"].includes(profile.role)) {
+  if (!profile || !["admin", "master", "tester"].includes(profile.role)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
 

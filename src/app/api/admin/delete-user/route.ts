@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     .eq("id", adminUserId)
     .single();
 
-  if (!adminProfile || adminProfile.role !== "admin") {
+  if (!adminProfile || !["admin", "tester"].includes(adminProfile.role)) {
     return NextResponse.json({ error: "權限不足" }, { status: 403 });
   }
 

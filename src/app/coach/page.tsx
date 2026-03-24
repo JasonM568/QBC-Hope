@@ -4,9 +4,9 @@ import Navbar from "@/components/layout/navbar";
 import CoachList from "./coach-list";
 
 export default async function CoachDashboard() {
-  const { user, profile, supabase } = await requireRole(["coach", "admin", "master"]);
+  const { user, profile, supabase } = await requireRole(["coach", "admin", "master", "tester"]);
 
-  const isMaster = profile.role === "master" || profile.role === "admin";
+  const isMaster = profile.role === "master" || profile.role === "admin" || profile.role === "tester";
 
   // Master/admin sees all students, coach sees only assigned
   const studentsQuery = supabase

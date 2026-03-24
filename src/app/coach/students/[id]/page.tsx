@@ -13,9 +13,9 @@ export default async function StudentDetailPage({
 }: {
   params: { id: string };
 }) {
-  const { user, profile, supabase } = await requireRole(["coach", "admin", "master"]);
+  const { user, profile, supabase } = await requireRole(["coach", "admin", "master", "tester"]);
   const studentId = params.id;
-  const isMaster = profile.role === "master" || profile.role === "admin";
+  const isMaster = profile.role === "master" || profile.role === "admin" || profile.role === "tester";
 
   // Verify access: master/admin can see any student, coach only their own
   const studentQuery = supabase

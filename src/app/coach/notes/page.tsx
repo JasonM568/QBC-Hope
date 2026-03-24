@@ -3,8 +3,8 @@ import Navbar from "@/components/layout/navbar";
 import Link from "next/link";
 
 export default async function CoachNotesPage() {
-  const { user, profile, supabase } = await requireRole(["coach", "admin", "master"]);
-  const isMaster = profile.role === "master" || profile.role === "admin";
+  const { user, profile, supabase } = await requireRole(["coach", "admin", "master", "tester"]);
+  const isMaster = profile.role === "master" || profile.role === "admin" || profile.role === "tester";
 
   const notesQuery = supabase
     .from("coach_notes")

@@ -70,6 +70,11 @@ export async function POST(request: Request) {
         const message = await buildDailyReport(supabase, 1);
         await replyMessage(event.replyToken, [{ type: "text", text: message }]);
       }
+
+      if (text === "/members") {
+        const message = await buildMemberList(supabase);
+        await replyMessage(event.replyToken, [{ type: "text", text: message }]);
+      }
     }
   }
 
@@ -87,13 +92,15 @@ async function buildDailyReport(supabase: any, daysAgo: number): Promise<string>
   const dateFormatted = dateStr.replace(/-/g, "/");
   const checkTime = `${new Date(now.getTime() + 8 * 60 * 60 * 1000).toISOString().split("T")[0].replace(/-/g, "/")} ${String(taiwanNow.getUTCHours()).padStart(2, "0")}:${String(taiwanNow.getUTCMinutes()).padStart(2, "0")}`;
 
-  // Get all students
+  // Get all students (exclude admin/tester accounts)
   const { data: students } = await supabase
     .from("profiles")
-    .select("id, display_name")
+    .select("id, display_name, email")
     .eq("role", "student");
 
-  const allStudents: Student[] = students || [];
+  const allStudents: Student[] = (students || []).filter(
+    (s: { email: string }) => !EXCLUDED_EMAILS.includes(s.email)
+  );
   if (allStudents.length === 0) {
     return "目前沒有學員資料";
   }
@@ -176,6 +183,49 @@ async function buildDailyReport(supabase: any, daysAgo: number): Promise<string>
     ``,
     `加油！完成${label}的日報 💪`,
   ].filter(Boolean).join("\n");
+}
+
+// 排除的 email（admin/tester 帳號不列入統計）
+const EXCLUDED_EMAILS = ["306465@gmail.com", "chief@huibang.com.tw"];
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function buildMemberList(supabase: any): Promise<string> {
+  const { data } = await supabase
+    .from("profiles")
+    .select("display_name, email, role")
+    .order("display_name");
+
+  if (!data || data.length === 0) return "目前沒有成員資料";
+
+  // 排除測試帳號
+  const members = data.filter((d: { email: string }) => !EXCLUDED_EMAILS.includes(d.email));
+
+  const roleOrder = ["master", "coach", "student"];
+  const roleLabel: Record<string, string> = {
+    master: "總教練",
+    coach: "教練",
+    student: "學員",
+  };
+
+  const lines: string[] = [`👥 HOPE 成員名冊`, ``];
+  let totalCount = 0;
+
+  for (const role of roleOrder) {
+    const group = members
+      .filter((m: { role: string }) => m.role === role)
+      .map((m: { display_name: string }) => m.display_name || "未設定名稱")
+      .sort();
+
+    if (group.length === 0) continue;
+    totalCount += group.length;
+    lines.push(`${roleLabel[role]}（${group.length} 人）：`);
+    lines.push(group.join("、"));
+    lines.push(``);
+  }
+
+  lines.push(`總人數：${totalCount} 人`);
+
+  return lines.join("\n");
 }
 
 async function replyMessage(replyToken: string, messages: Array<{ type: string; text: string }>) {
