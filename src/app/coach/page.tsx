@@ -2,6 +2,7 @@ import { requireRole } from "@/lib/auth-guard";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import Navbar from "@/components/layout/navbar";
 import CoachList from "./coach-list";
+import WeeklyReportSummary from "./weekly-report-summary";
 
 export default async function CoachDashboard() {
   const { user, profile, supabase } = await requireRole(["coach", "admin", "master", "tester"]);
@@ -53,6 +54,44 @@ export default async function CoachDashboard() {
   const countMap: Record<string, number> = {};
   reportCounts?.forEach((r) => {
     countMap[r.user_id] = (countMap[r.user_id] || 0) + 1;
+  });
+
+  // Get recent 7 days report data
+  const recentDays: string[] = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(taiwanDate.getTime() - i * 24 * 60 * 60 * 1000);
+    const ds = d.toISOString().split("T")[0];
+    if (ds >= "2026-03-23") recentDays.push(ds);
+  }
+
+  const { data: recentReports } = studentIds.length > 0 && recentDays.length > 0
+    ? await reportClient
+        .from("daily_reports")
+        .select("user_id, report_date")
+        .in("user_id", studentIds)
+        .in("report_date", recentDays)
+    : { data: [] };
+
+  // Build per-day stats
+  const recentDayStats = recentDays.map((date) => {
+    const dayReports = (recentReports || []).filter((r) => r.report_date === date);
+    const submittedIds = dayReports.map((r) => r.user_id);
+    const submittedNames = (students || [])
+      .filter((s) => submittedIds.includes(s.id))
+      .map((s) => s.display_name || "未設定名稱")
+      .sort();
+    const missingNames = (students || [])
+      .filter((s) => !submittedIds.includes(s.id))
+      .map((s) => s.display_name || "未設定名稱")
+      .sort();
+    return {
+      date,
+      submitted: submittedIds.length,
+      missing: (students?.length || 0) - submittedIds.length,
+      total: students?.length || 0,
+      submittedNames,
+      missingNames,
+    };
   });
 
   // Get coach list and names for master view
@@ -172,6 +211,9 @@ export default async function CoachDashboard() {
             </div>
           )}
         </div>
+
+        {/* Weekly Report Summary */}
+        <WeeklyReportSummary days={recentDayStats} today={today} />
 
         <CoachList
           students={students || []}
