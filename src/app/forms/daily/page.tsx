@@ -128,17 +128,53 @@ export default function DailyReportPage() {
   const [startingSaving, setStartingSaving] = useState(false);
   const [planRound, setPlanRound] = useState(1);
   const [today, setToday] = useState("");
+  const [selectedDate, setSelectedDate] = useState("");
+  const [showBackfill, setShowBackfill] = useState(false);
   const router = useRouter();
 
   const set = <K extends keyof DailyReport>(key: K, value: DailyReport[K]) =>
     setReport((prev) => ({ ...prev, [key]: value }));
 
-  // 計算今天是第幾天
-  function calcDayNumber(startDate: string, round: number): number {
+  const activeDate = selectedDate || today;
+
+  // 計算指定日期是第幾天
+  function calcDayNumber(startDate: string, round: number, forDate?: string): number {
     const start = new Date(startDate);
-    const now = new Date(today);
-    const diff = Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+    const target = new Date(forDate || today);
+    const diff = Math.floor((target.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
     return diff - (round - 1) * 21 + 1;
+  }
+
+  // 切換日期時重新載入資料
+  async function switchDate(newDate: string) {
+    setSelectedDate(newDate);
+    setLoading(true);
+    setExisting(false);
+    setEditing(false);
+    setMessage("");
+    setReport(emptyReport);
+
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { setLoading(false); return; }
+
+    if (planStartDate) {
+      const dayNum = calcDayNumber(planStartDate, planRound, newDate);
+      setReport((prev) => ({ ...prev, day_number: dayNum > 0 ? dayNum : 1 }));
+    }
+
+    const { data } = await supabase
+      .from("daily_reports")
+      .select("*")
+      .eq("user_id", user.id)
+      .eq("report_date", newDate)
+      .maybeSingle();
+
+    if (data) {
+      setReport({ ...emptyReport, ...data });
+      setExisting(true);
+    }
+    setLoading(false);
   }
 
   useEffect(() => {
@@ -259,12 +295,12 @@ export default function DailyReportPage() {
     };
 
     if (existing && editing) {
-      // 修改模式：更新當天日報
+      // 修改模式：更新日報
       const { error } = await supabase
         .from("daily_reports")
         .update(safeData)
         .eq("user_id", user.id)
-        .eq("report_date", today);
+        .eq("report_date", activeDate);
 
       if (error) {
         setMessage("修改失敗：" + error.message);
@@ -276,7 +312,7 @@ export default function DailyReportPage() {
       // 新增模式
       const { error } = await supabase.from("daily_reports").insert({
         user_id: user.id,
-        report_date: today,
+        report_date: activeDate,
         ...safeData,
       });
 
@@ -380,10 +416,50 @@ export default function DailyReportPage() {
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Header Info */}
           <div className="p-6 rounded-xl border border-border bg-card space-y-4">
+            {/* 補填過去日期 */}
+            {!showBackfill && activeDate === today && (
+              <button
+                type="button"
+                onClick={() => setShowBackfill(true)}
+                className="text-xs text-muted-foreground hover:text-gold transition-colors"
+              >
+                需要補填過去的日報？
+              </button>
+            )}
+            {showBackfill && (
+              <div className="p-3 rounded-lg border border-gold/30 bg-gold/5 space-y-2">
+                <p className="text-sm font-medium text-gold">補填日報（限 7 天內）</p>
+                <div className="flex gap-2 flex-wrap">
+                  {Array.from({ length: 7 }, (_, i) => {
+                    const d = new Date(new Date().getTime() + 8 * 60 * 60 * 1000);
+                    d.setUTCDate(d.getUTCDate() - i);
+                    const ds = d.toISOString().split("T")[0];
+                    const label = i === 0 ? "今天" : i === 1 ? "昨天" : `${d.getUTCMonth() + 1}/${d.getUTCDate()}`;
+                    return (
+                      <button
+                        key={ds}
+                        type="button"
+                        onClick={() => { if (ds === today) { setSelectedDate(""); } else { switchDate(ds); } }}
+                        className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                          activeDate === ds
+                            ? "bg-gold text-black"
+                            : "bg-secondary text-muted-foreground hover:bg-secondary/80"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+                {activeDate !== today && (
+                  <p className="text-xs text-yellow-400">正在補填 {activeDate} 的日報</p>
+                )}
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>日期</Label>
-                <Input value={today} disabled className="mt-1 bg-background border-border" />
+                <Input value={activeDate} disabled className={`mt-1 bg-background border-border ${activeDate !== today ? "text-yellow-400" : ""}`} />
               </div>
               <div>
                 <Label>第幾天 (1-21)</Label>
@@ -666,7 +742,7 @@ export default function DailyReportPage() {
             <ReportPreview
               reportTitle="21天行動系統日報表"
               subtitle={`Day ${report.day_number}${planRound > 1 ? ` (第${planRound}輪)` : ""}`}
-              date={today}
+              date={activeDate}
               userName={userName}
               gridLayout
               sections={[
@@ -745,7 +821,7 @@ export default function DailyReportPage() {
               onExportPDF={() =>
                 exportDailyPDF({
                   userName,
-                  date: today,
+                  date: activeDate,
                   dayNumber: report.day_number,
                   planRound,
                   energyState: report.energy_state,
