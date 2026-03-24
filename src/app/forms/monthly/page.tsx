@@ -186,7 +186,7 @@ export default function MonthlyReportPage() {
     setMessage("");
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) { setMessage("登入狀態已過期，請重新登入。建議使用外部瀏覽器（Safari/Chrome）開啟。"); setSaving(false); return; }
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { id: _id, user_id: _uid, created_at: _ca, ...formData } = form as MonthlyForm & Record<string, unknown>;

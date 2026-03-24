@@ -195,7 +195,7 @@ export default function DailyReportPage() {
     setStartingSaving(true);
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) { setMessage("登入狀態已過期，請重新登入"); setStartingSaving(false); return; }
 
     const { error } = await supabase
       .from("profiles")
@@ -218,7 +218,7 @@ export default function DailyReportPage() {
     setStartingSaving(true);
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) { setMessage("登入狀態已過期，請重新登入"); setStartingSaving(false); return; }
 
     const newRound = planRound + 1;
     const { error } = await supabase
@@ -244,7 +244,11 @@ export default function DailyReportPage() {
 
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) {
+      setMessage("登入狀態已過期，請重新登入。建議使用外部瀏覽器（Safari/Chrome）開啟。");
+      setSaving(false);
+      return;
+    }
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { id: _id, ...reportData } = report;

@@ -146,7 +146,7 @@ export default function CapitalInventoryPage() {
     setMessage("");
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) { setMessage("登入狀態已過期，請重新登入。建議使用外部瀏覽器（Safari/Chrome）開啟。"); setSaving(false); return; }
 
     const { error } = await supabase.from("capital_inventories").insert({
       user_id: user.id,
