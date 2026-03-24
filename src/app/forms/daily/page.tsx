@@ -129,7 +129,6 @@ export default function DailyReportPage() {
   const [planRound, setPlanRound] = useState(1);
   const [today, setToday] = useState("");
   const [selectedDate, setSelectedDate] = useState("");
-  const [showBackfill, setShowBackfill] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [pastReports, setPastReports] = useState<{ report_date: string; day_number: number; energy_state: number; daily_score: number }[]>([]);
   const router = useRouter();
@@ -382,12 +381,58 @@ export default function DailyReportPage() {
         <div className="mb-6">
           <h1 className="text-2xl font-bold">21天行動系統日報表</h1>
           <p className="text-muted-foreground mt-1">21-Day Action System Daily Report</p>
-          {existing && (
-            <span className="inline-block mt-2 px-3 py-1 bg-green-400/10 text-green-400 text-sm rounded-full">
-              今日已完成
-            </span>
-          )}
         </div>
+
+        {/* 常駐日期切換列 */}
+        {planStartDate && (
+          <div className="mb-6 p-4 rounded-xl border border-border bg-card space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-gold">近 7 天日報</p>
+              <p className="text-xs text-muted-foreground">
+                {(() => {
+                  const filledDates = new Set(pastReports.map(r => r.report_date));
+                  const count = Array.from({ length: 7 }, (_, i) => {
+                    const d = new Date(new Date().getTime() + 8 * 60 * 60 * 1000);
+                    d.setUTCDate(d.getUTCDate() - i);
+                    return d.toISOString().split("T")[0];
+                  }).filter(ds => filledDates.has(ds)).length;
+                  return `已完成 ${count}/7 天`;
+                })()}
+              </p>
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              {Array.from({ length: 7 }, (_, i) => {
+                const d = new Date(new Date().getTime() + 8 * 60 * 60 * 1000);
+                d.setUTCDate(d.getUTCDate() - i);
+                const ds = d.toISOString().split("T")[0];
+                const label = i === 0 ? "今天" : i === 1 ? "昨天" : `${d.getUTCMonth() + 1}/${d.getUTCDate()}`;
+                const filled = pastReports.some(r => r.report_date === ds);
+                const isActive = activeDate === ds;
+                return (
+                  <button
+                    key={ds}
+                    type="button"
+                    onClick={() => { if (ds === today) { setSelectedDate(""); } else { switchDate(ds); } }}
+                    className={`relative px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                      isActive
+                        ? "bg-gold text-black"
+                        : filled
+                          ? "bg-green-400/15 text-green-400 hover:bg-green-400/25"
+                          : "bg-red-400/10 text-red-400 hover:bg-red-400/20"
+                    }`}
+                  >
+                    {label}
+                    {filled && !isActive && <span className="ml-1">✓</span>}
+                    {!filled && !isActive && <span className="ml-1">!</span>}
+                  </button>
+                );
+              })}
+            </div>
+            {activeDate !== today && (
+              <p className="text-xs text-yellow-400">正在查看 {activeDate} 的日報</p>
+            )}
+          </div>
+        )}
 
         {/* 計畫啟動區塊 */}
         {!planStartDate && !loading && (
@@ -449,44 +494,12 @@ export default function DailyReportPage() {
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Header Info */}
           <div className="p-6 rounded-xl border border-border bg-card space-y-4">
-            {/* 補填過去日期 */}
-            {!showBackfill && activeDate === today && (
-              <button
-                type="button"
-                onClick={() => setShowBackfill(true)}
-                className="text-xs text-muted-foreground hover:text-gold transition-colors"
-              >
-                需要補填過去的日報？
-              </button>
-            )}
-            {showBackfill && (
-              <div className="p-3 rounded-lg border border-gold/30 bg-gold/5 space-y-2">
-                <p className="text-sm font-medium text-gold">補填日報（限 7 天內）</p>
-                <div className="flex gap-2 flex-wrap">
-                  {Array.from({ length: 7 }, (_, i) => {
-                    const d = new Date(new Date().getTime() + 8 * 60 * 60 * 1000);
-                    d.setUTCDate(d.getUTCDate() - i);
-                    const ds = d.toISOString().split("T")[0];
-                    const label = i === 0 ? "今天" : i === 1 ? "昨天" : `${d.getUTCMonth() + 1}/${d.getUTCDate()}`;
-                    return (
-                      <button
-                        key={ds}
-                        type="button"
-                        onClick={() => { if (ds === today) { setSelectedDate(""); } else { switchDate(ds); } }}
-                        className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                          activeDate === ds
-                            ? "bg-gold text-black"
-                            : "bg-secondary text-muted-foreground hover:bg-secondary/80"
-                        }`}
-                      >
-                        {label}
-                      </button>
-                    );
-                  })}
-                </div>
-                {activeDate !== today && (
-                  <p className="text-xs text-yellow-400">正在補填 {activeDate} 的日報</p>
-                )}
+            {/* 非今天的日期提示 */}
+            {activeDate !== today && (
+              <div className="p-2 rounded-lg bg-yellow-400/10 border border-yellow-400/30">
+                <p className="text-xs text-yellow-400 text-center">
+                  {existing ? `正在查看 ${activeDate} 的日報` : `正在補填 ${activeDate} 的日報`}
+                </p>
               </div>
             )}
             <div className="grid grid-cols-2 gap-4">
