@@ -127,8 +127,8 @@ export default function DailyReportPage() {
   const [planInputDate, setPlanInputDate] = useState("");
   const [startingSaving, setStartingSaving] = useState(false);
   const [planRound, setPlanRound] = useState(1);
+  const [today, setToday] = useState("");
   const router = useRouter();
-  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" });
 
   const set = <K extends keyof DailyReport>(key: K, value: DailyReport[K]) =>
     setReport((prev) => ({ ...prev, [key]: value }));
@@ -142,6 +142,10 @@ export default function DailyReportPage() {
   }
 
   useEffect(() => {
+    // 在 client 端即時計算台灣日期，避免靜態預渲染導致日期錯誤
+    const clientToday = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" });
+    setToday(clientToday);
+
     async function load() {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
@@ -167,7 +171,7 @@ export default function DailyReportPage() {
         .from("daily_reports")
         .select("*")
         .eq("user_id", user.id)
-        .eq("report_date", today)
+        .eq("report_date", clientToday)
         .maybeSingle();
 
       if (data) {
@@ -181,7 +185,7 @@ export default function DailyReportPage() {
     }
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router, today]);
+  }, [router]);
 
   async function startPlan() {
     if (!planInputDate) {
