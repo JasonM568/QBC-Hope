@@ -384,55 +384,103 @@ export default function DailyReportPage() {
         </div>
 
         {/* 常駐日期切換列 */}
-        {planStartDate && (
-          <div className="mb-6 p-4 rounded-xl border border-border bg-card space-y-3">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-gold">近 7 天日報</p>
-              <p className="text-xs text-muted-foreground">
-                {(() => {
-                  const filledDates = new Set(pastReports.map(r => r.report_date));
-                  const count = Array.from({ length: 7 }, (_, i) => {
-                    const d = new Date(new Date().getTime() + 8 * 60 * 60 * 1000);
-                    d.setUTCDate(d.getUTCDate() - i);
-                    return d.toISOString().split("T")[0];
-                  }).filter(ds => filledDates.has(ds)).length;
-                  return `已完成 ${count}/7 天`;
-                })()}
-              </p>
+        {planStartDate && (() => {
+          // 計算 21 天計畫範圍
+          const [sy, sm, sd] = planStartDate.split("-").map(Number);
+          const planStart = new Date(Date.UTC(sy, sm - 1, sd));
+          const planEnd = new Date(planStart.getTime() + 20 * 24 * 60 * 60 * 1000);
+          const planEndStr = planEnd.toISOString().split("T")[0];
+
+          // 產生 21 天完整日期列表
+          const allDays: string[] = [];
+          for (let i = 0; i < 21; i++) {
+            const d = new Date(planStart.getTime() + i * 24 * 60 * 60 * 1000);
+            allDays.push(d.toISOString().split("T")[0]);
+          }
+
+          // 統計已填寫
+          const filledDates = new Set(pastReports.map(r => r.report_date));
+          const filledCount = allDays.filter(ds => filledDates.has(ds)).length;
+
+          // 預設顯示近 7 天（限制在計畫範圍內）
+          const recentDays: string[] = [];
+          for (let i = 0; i < 7; i++) {
+            const d = new Date(new Date().getTime() + 8 * 60 * 60 * 1000);
+            d.setUTCDate(d.getUTCDate() - i);
+            const ds = d.toISOString().split("T")[0];
+            if (ds >= planStartDate && ds <= planEndStr) {
+              recentDays.push(ds);
+            }
+          }
+
+          return (
+            <div className="mb-6 p-4 rounded-xl border border-border bg-card space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium text-gold">近 7 天日報</p>
+                <p className="text-xs text-muted-foreground">
+                  21 天已完成 {filledCount}/21 天
+                </p>
+              </div>
+              <div className="flex gap-2 flex-wrap">
+                {recentDays.map((ds) => {
+                  const dayNum = calcDayNumber(planStartDate, planRound, ds);
+                  const filled = filledDates.has(ds);
+                  const isActive = activeDate === ds;
+                  const isToday = ds === today;
+                  const label = isToday ? "今天" : `Day ${dayNum}`;
+                  return (
+                    <button
+                      key={ds}
+                      type="button"
+                      onClick={() => { if (isToday) { setSelectedDate(""); } else { switchDate(ds); } }}
+                      className={`relative px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                        isActive
+                          ? "bg-gold text-black"
+                          : filled
+                            ? "bg-green-400/15 text-green-400 hover:bg-green-400/25"
+                            : "bg-red-400/10 text-red-400 hover:bg-red-400/20"
+                      }`}
+                    >
+                      {label}
+                      {filled && !isActive && <span className="ml-1">✓</span>}
+                      {!filled && !isActive && <span className="ml-1">!</span>}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* 指定日期選擇器 */}
+              <div className="flex items-center gap-2 pt-1 border-t border-border">
+                <p className="text-xs text-muted-foreground shrink-0">指定日期</p>
+                <select
+                  value={activeDate}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === today) { setSelectedDate(""); } else { switchDate(v); }
+                  }}
+                  className="flex-1 text-xs bg-background border border-border rounded-lg px-2 py-1.5 text-foreground [color-scheme:dark]"
+                >
+                  {allDays.map((ds) => {
+                    const dayNum = calcDayNumber(planStartDate, planRound, ds);
+                    const filled = filledDates.has(ds);
+                    const isToday = ds === today;
+                    return (
+                      <option key={ds} value={ds}>
+                        Day {dayNum}（{ds}）{isToday ? " — 今天" : ""}{filled ? " ✓" : ""}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+
+              {activeDate !== today && (
+                <p className="text-xs text-yellow-400">
+                  {existing ? `正在查看 ${activeDate} 的日報` : `正在補填 ${activeDate} 的日報`}
+                </p>
+              )}
             </div>
-            <div className="flex gap-2 flex-wrap">
-              {Array.from({ length: 7 }, (_, i) => {
-                const d = new Date(new Date().getTime() + 8 * 60 * 60 * 1000);
-                d.setUTCDate(d.getUTCDate() - i);
-                const ds = d.toISOString().split("T")[0];
-                const label = i === 0 ? "今天" : i === 1 ? "昨天" : `${d.getUTCMonth() + 1}/${d.getUTCDate()}`;
-                const filled = pastReports.some(r => r.report_date === ds);
-                const isActive = activeDate === ds;
-                return (
-                  <button
-                    key={ds}
-                    type="button"
-                    onClick={() => { if (ds === today) { setSelectedDate(""); } else { switchDate(ds); } }}
-                    className={`relative px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                      isActive
-                        ? "bg-gold text-black"
-                        : filled
-                          ? "bg-green-400/15 text-green-400 hover:bg-green-400/25"
-                          : "bg-red-400/10 text-red-400 hover:bg-red-400/20"
-                    }`}
-                  >
-                    {label}
-                    {filled && !isActive && <span className="ml-1">✓</span>}
-                    {!filled && !isActive && <span className="ml-1">!</span>}
-                  </button>
-                );
-              })}
-            </div>
-            {activeDate !== today && (
-              <p className="text-xs text-yellow-400">正在查看 {activeDate} 的日報</p>
-            )}
-          </div>
-        )}
+          );
+        })()}
 
         {/* 計畫啟動區塊 */}
         {!planStartDate && !loading && (
@@ -494,14 +542,6 @@ export default function DailyReportPage() {
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Header Info */}
           <div className="p-6 rounded-xl border border-border bg-card space-y-4">
-            {/* 非今天的日期提示 */}
-            {activeDate !== today && (
-              <div className="p-2 rounded-lg bg-yellow-400/10 border border-yellow-400/30">
-                <p className="text-xs text-yellow-400 text-center">
-                  {existing ? `正在查看 ${activeDate} 的日報` : `正在補填 ${activeDate} 的日報`}
-                </p>
-              </div>
-            )}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>日期</Label>
