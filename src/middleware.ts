@@ -1,7 +1,17 @@
 import { updateSession } from "@/lib/supabase/middleware";
-import { type NextRequest } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 
 export async function middleware(request: NextRequest) {
+  // 將 Vercel 子網域轉向到正式網域
+  const host = request.headers.get("host") || "";
+  if (host.includes("vercel.app")) {
+    const url = new URL(request.url);
+    url.host = "hope.huangxi.info";
+    url.protocol = "https";
+    url.port = "";
+    return NextResponse.redirect(url, 301);
+  }
+
   return await updateSession(request);
 }
 
