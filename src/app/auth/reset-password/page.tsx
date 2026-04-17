@@ -20,46 +20,50 @@ export default function ResetPasswordPage() {
   useEffect(() => {
     const supabase = createClient();
 
-    // 方式 1：URL query 中有 code（PKCE flow）
-    const params = new URLSearchParams(window.location.search);
-    const code = params.get("code");
-    if (code) {
-      supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
-        if (!error) {
-          setSessionReady(true);
-        } else {
-          setError("連結已過期或無效，請重新申請重設密碼。");
+    async function handleToken() {
+      // 方式 1：URL query 中有 code（PKCE flow）
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get("code");
+      if (code) {
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        if (!error) { setSessionReady(true); }
+        else { setError("連結已過期或無效，請重新申請重設密碼。"); }
+        return;
+      }
+
+      // 方式 2：URL hash fragment 中有 access_token（implicit flow）
+      const hash = window.location.hash.substring(1);
+      if (hash) {
+        const hashParams = new URLSearchParams(hash);
+        const accessToken = hashParams.get("access_token");
+        const refreshToken = hashParams.get("refresh_token");
+
+        if (accessToken) {
+          const { error } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken || "",
+          });
+          if (!error) { setSessionReady(true); }
+          else { setError("連結已過期或無效，請重新申請重設密碼。"); }
+          return;
         }
-      });
-      return;
-    }
 
-    // 方式 2：URL hash fragment 中有 access_token（implicit flow）
-    const hash = window.location.hash;
-    if (hash && hash.includes("access_token")) {
-      // Supabase client 會自動從 hash 讀取 token 建立 session
-      // 但需要等它處理完，用 onAuthStateChange 監聽
-    }
+        // hash 中有 error
+        const hashError = hashParams.get("error_description");
+        if (hashError) {
+          setError(decodeURIComponent(hashError.replace(/\+/g, " ")));
+          return;
+        }
+      }
 
-    // 監聯 auth state 變化
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") {
+      // 方式 3：已經有 session（例如從其他頁面跳轉過來）
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
         setSessionReady(true);
       }
-    });
-
-    // 額外檢查：如果 hash 存在但事件沒觸發，5 秒後嘗試直接取 session
-    if (hash && hash.includes("access_token")) {
-      setTimeout(async () => {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session && !sessionReady) {
-          setSessionReady(true);
-        }
-      }, 2000);
     }
 
-    return () => subscription.unsubscribe();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    handleToken();
   }, []);
 
   async function handleSubmit(e: React.FormEvent) {
