@@ -75,6 +75,9 @@ export default function AdminPanel({
   const [broadcastHistory, setBroadcastHistory] = useState<Array<{
     id: string; message: string; scheduled_at: string; status: string; sent_at: string | null; created_at: string;
   }>>([]);
+  // 模組開關
+  const [moduleSettings, setModuleSettings] = useState<{ module_key: string; module_name: string; enabled: boolean }[]>([]);
+  const [moduleUpdating, setModuleUpdating] = useState<string | null>(null);
   // 搜尋
   const [searchQuery, setSearchQuery] = useState("");
   // 批次指派
@@ -103,6 +106,19 @@ export default function AdminPanel({
     loadSettings();
   }, [isAdmin]);
 
+  // 載入模組開關設定
+  useEffect(() => {
+    async function loadModules() {
+      const supabase = createClient();
+      const { data } = await supabase
+        .from("module_settings")
+        .select("module_key, module_name, enabled")
+        .order("module_key");
+      if (data) setModuleSettings(data);
+    }
+    loadModules();
+  }, []);
+
   // 載入推播歷史
   useEffect(() => {
     if (!canBroadcast) return;
@@ -117,6 +133,17 @@ export default function AdminPanel({
     }
     loadBroadcasts();
   }, [canBroadcast]);
+
+  async function toggleModule(moduleKey: string, enabled: boolean) {
+    setModuleUpdating(moduleKey);
+    const supabase = createClient();
+    await supabase
+      .from("module_settings")
+      .update({ enabled, updated_at: new Date().toISOString() })
+      .eq("module_key", moduleKey);
+    setModuleSettings(prev => prev.map(m => m.module_key === moduleKey ? { ...m, enabled } : m));
+    setModuleUpdating(null);
+  }
 
   async function updateRole(userId: string, newRole: string) {
     if (userId === currentUserId) {
@@ -421,6 +448,35 @@ export default function AdminPanel({
           </p>
         </div>
       </div>
+
+      {/* 模組開關 */}
+      {moduleSettings.length > 0 && (
+        <div className="mb-8 p-6 rounded-xl border border-border bg-card">
+          <h2 className="text-lg font-bold mb-4">模組管理</h2>
+          <p className="text-xs text-muted-foreground mb-4">開啟或關閉學員／教練可使用的表單模組</p>
+          <div className="space-y-3">
+            {moduleSettings.map((m) => (
+              <div key={m.module_key} className="flex items-center justify-between p-3 rounded-lg border border-border">
+                <div>
+                  <p className="text-sm font-medium">{m.module_name}</p>
+                  <p className="text-xs text-muted-foreground">/forms/{m.module_key}</p>
+                </div>
+                <button
+                  onClick={() => toggleModule(m.module_key, !m.enabled)}
+                  disabled={moduleUpdating === m.module_key}
+                  className={`relative w-12 h-6 rounded-full transition-colors ${
+                    m.enabled ? "bg-gold" : "bg-zinc-600"
+                  }`}
+                >
+                  <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform ${
+                    m.enabled ? "left-6" : "left-0.5"
+                  }`} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Daily Report Stats */}
       <div className="mb-8 p-6 rounded-xl border border-border bg-card">

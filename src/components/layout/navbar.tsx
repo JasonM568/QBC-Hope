@@ -6,13 +6,13 @@ import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import IdleTimeout from "@/components/idle-timeout";
 
-const studentItems = [
+const allStudentItems = [
   { href: "/dashboard", label: "儀表板" },
-  { href: "/forms/daily", label: "日報表" },
-  { href: "/forms/monthly", label: "月報" },
-  { href: "/forms/weekly", label: "週報" },
-  { href: "/forms/capital", label: "資本盤點" },
-  { href: "/forms/strategy", label: "戰略定位" },
+  { href: "/forms/daily", label: "日報表", moduleKey: "daily" },
+  { href: "/forms/monthly", label: "月報", moduleKey: "monthly" },
+  { href: "/forms/weekly", label: "週報", moduleKey: "weekly" },
+  { href: "/forms/capital", label: "資本盤點", moduleKey: "capital" },
+  { href: "/forms/strategy", label: "戰略定位", moduleKey: "strategy" },
   { href: "/history", label: "成長曲線" },
   { href: "/community", label: "打卡牆" },
 ];
@@ -27,27 +27,42 @@ export default function Navbar({ userName, userRole }: { userName?: string; user
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const [role, setRole] = useState(userRole || "");
+  const [enabledModules, setEnabledModules] = useState<Set<string>>(new Set());
+  const [modulesLoaded, setModulesLoaded] = useState(false);
 
   useEffect(() => {
-    if (userRole) { setRole(userRole); return; }
-    async function loadRole() {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data } = await supabase
-          .from("profiles")
-          .select("role")
-          .eq("id", user.id)
-          .single();
-        if (data) setRole(data.role);
+    const supabase = createClient();
+
+    async function loadData() {
+      // 載入角色
+      if (!userRole) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data } = await supabase.from("profiles").select("role").eq("id", user.id).single();
+          if (data) setRole(data.role);
+        }
       }
+
+      // 載入模組開關
+      const { data: modules } = await supabase
+        .from("module_settings")
+        .select("module_key, enabled");
+      if (modules) {
+        setEnabledModules(new Set(modules.filter(m => m.enabled).map(m => m.module_key)));
+      }
+      setModulesLoaded(true);
     }
-    loadRole();
+    loadData();
   }, [userRole]);
 
   const isCoachOrAbove = role === "coach" || role === "admin" || role === "master" || role === "tester";
   const isAdminOrMaster = role === "admin" || role === "master" || role === "tester";
   const isOnCoachPage = pathname.startsWith("/coach") || pathname.startsWith("/admin");
+
+  // 根據模組開關過濾學員選項（管理者可看到所有模組）
+  const studentItems = modulesLoaded
+    ? allStudentItems.filter(item => !item.moduleKey || isAdminOrMaster || enabledModules.has(item.moduleKey))
+    : allStudentItems.filter(item => !item.moduleKey); // 載入前只顯示非模組項目
 
   const navItems = isOnCoachPage && isCoachOrAbove
     ? [...coachItems, ...(isAdminOrMaster ? [{ href: "/admin", label: "管理後台" }] : []), { href: "/dashboard", label: "學員端" }]
