@@ -20,7 +20,7 @@ export default function ResetPasswordPage() {
   useEffect(() => {
     const supabase = createClient();
 
-    // 嘗試從 URL 的 code 參數交換 session
+    // 方式 1：URL query 中有 code（PKCE flow）
     const params = new URLSearchParams(window.location.search);
     const code = params.get("code");
     if (code) {
@@ -34,12 +34,32 @@ export default function ResetPasswordPage() {
       return;
     }
 
-    // fallback: 監聽 hash fragment 方式（舊版 Supabase）
-    supabase.auth.onAuthStateChange((event) => {
-      if (event === "PASSWORD_RECOVERY") {
+    // 方式 2：URL hash fragment 中有 access_token（implicit flow）
+    const hash = window.location.hash;
+    if (hash && hash.includes("access_token")) {
+      // Supabase client 會自動從 hash 讀取 token 建立 session
+      // 但需要等它處理完，用 onAuthStateChange 監聽
+    }
+
+    // 監聯 auth state 變化
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") {
         setSessionReady(true);
       }
     });
+
+    // 額外檢查：如果 hash 存在但事件沒觸發，5 秒後嘗試直接取 session
+    if (hash && hash.includes("access_token")) {
+      setTimeout(async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session && !sessionReady) {
+          setSessionReady(true);
+        }
+      }, 2000);
+    }
+
+    return () => subscription.unsubscribe();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function handleSubmit(e: React.FormEvent) {
