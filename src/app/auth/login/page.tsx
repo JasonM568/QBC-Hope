@@ -88,9 +88,9 @@ function LoginForm() {
       </form>
 
       <p className="text-center text-sm text-muted-foreground mt-4">
-        <Link href="/auth/forgot-password" className="text-gold hover:underline">
+        <a href="/auth/forgot-password" className="text-gold hover:underline">
           忘記密碼？
-        </Link>
+        </a>
       </p>
       <p className="text-center text-sm text-muted-foreground mt-3">
         還沒有帳號？{" "}
