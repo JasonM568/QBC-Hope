@@ -18,8 +18,23 @@ export default function ResetPasswordPage() {
   const router = useRouter();
 
   useEffect(() => {
-    // Supabase 會自動從 URL hash 中讀取 token 並建立 session
     const supabase = createClient();
+
+    // 嘗試從 URL 的 code 參數交換 session
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("code");
+    if (code) {
+      supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
+        if (!error) {
+          setSessionReady(true);
+        } else {
+          setError("連結已過期或無效，請重新申請重設密碼。");
+        }
+      });
+      return;
+    }
+
+    // fallback: 監聽 hash fragment 方式（舊版 Supabase）
     supabase.auth.onAuthStateChange((event) => {
       if (event === "PASSWORD_RECOVERY") {
         setSessionReady(true);
