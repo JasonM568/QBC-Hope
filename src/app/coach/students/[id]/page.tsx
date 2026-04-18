@@ -4,6 +4,7 @@ import Navbar from "@/components/layout/navbar";
 import Link from "next/link";
 import CoachNoteForm from "./coach-note-form";
 import PlanResetForm from "./plan-reset-form";
+import AdvancedToggle from "./advanced-toggle";
 import StudentNameForm from "./student-name-form";
 import DailyReportCard from "./daily-report-card";
 import { WeeklyCard, MonthlyCard, CapitalCard, StrategyCard } from "./form-cards";
@@ -20,7 +21,7 @@ export default async function StudentDetailPage({
   // Verify access: master/admin can see any student, coach only their own
   const studentQuery = supabase
     .from("profiles")
-    .select("id, display_name, email, created_at, plan_start_date, plan_round")
+    .select("id, display_name, email, created_at, plan_start_date, plan_round, advanced_modules_enabled")
     .eq("id", studentId);
 
   if (!isMaster) {
@@ -157,6 +158,12 @@ export default async function StudentDetailPage({
             currentStartDate={student.plan_start_date || null}
             currentRound={student.plan_round || 1}
           />
+          <div className="mt-3">
+            <AdvancedToggle
+              studentId={studentId}
+              initialEnabled={student.advanced_modules_enabled || false}
+            />
+          </div>
         </div>
 
         {/* 提交狀態總覽 */}
