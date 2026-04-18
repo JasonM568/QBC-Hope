@@ -11,12 +11,14 @@ export default async function DashboardPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role, display_name")
+    .select("role, display_name, plan_start_date, plan_round")
     .eq("id", user.id)
     .single();
 
   const displayName = profile?.display_name || user.user_metadata?.display_name || user.email;
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" });
+  const planStartDate = profile?.plan_start_date || null;
+  const planRound = profile?.plan_round || 1;
 
   // Check if today's daily report exists
   const { data: todayReport } = await supabase
@@ -26,19 +28,27 @@ export default async function DashboardPage() {
     .eq("report_date", today)
     .single();
 
-  // Get total daily report count
-  const { count: totalReports } = await supabase
+  // Get current round daily report count (only count from plan_start_date)
+  let totalReportsQuery = supabase
     .from("daily_reports")
     .select("*", { count: "exact", head: true })
     .eq("user_id", user.id);
+  if (planStartDate) {
+    totalReportsQuery = totalReportsQuery.gte("report_date", planStartDate);
+  }
+  const { count: totalReports } = await totalReportsQuery;
 
-  // Get streak (consecutive days)
-  const { data: recentReports } = await supabase
+  // Get streak (consecutive days) — only within current round
+  let streakQuery = supabase
     .from("daily_reports")
     .select("report_date")
     .eq("user_id", user.id)
     .order("report_date", { ascending: false })
     .limit(30);
+  if (planStartDate) {
+    streakQuery = streakQuery.gte("report_date", planStartDate);
+  }
+  const { data: recentReports } = await streakQuery;
 
   let streak = 0;
   if (recentReports && recentReports.length > 0) {
@@ -82,8 +92,10 @@ export default async function DashboardPage() {
         {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
           <div className="p-6 rounded-xl border border-border bg-card">
-            <p className="text-muted-foreground text-sm">累計天數</p>
-            <p className="text-3xl font-bold text-gold mt-1">{totalReports || 0}</p>
+            <p className="text-muted-foreground text-sm">
+              {planStartDate ? `第 ${planRound} 輪累計` : "累計天數"}
+            </p>
+            <p className="text-3xl font-bold text-gold mt-1">{totalReports || 0}<span className="text-base font-normal text-muted-foreground"> / 21 天</span></p>
           </div>
           <div className="p-6 rounded-xl border border-border bg-card">
             <p className="text-muted-foreground text-sm">連續打卡</p>
