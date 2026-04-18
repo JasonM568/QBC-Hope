@@ -127,6 +127,7 @@ export default function DailyReportPage() {
   const [planInputDate, setPlanInputDate] = useState("");
   const [startingSaving, setStartingSaving] = useState(false);
   const [planRound, setPlanRound] = useState(1);
+  const [roundResetUsed, setRoundResetUsed] = useState(false);
   const [today, setToday] = useState("");
   const [selectedDate, setSelectedDate] = useState("");
   const [showHistory, setShowHistory] = useState(false);
@@ -200,11 +201,13 @@ export default function DailyReportPage() {
       // 載入計畫起始日與姓名
       const { data: profile } = await supabase
         .from("profiles")
-        .select("plan_start_date, plan_round, display_name")
+        .select("plan_start_date, plan_round, display_name, round_reset_used")
         .eq("id", user.id)
         .single();
 
       setUserName(profile?.display_name || user.user_metadata?.display_name || user.email || "");
+
+      setRoundResetUsed(profile?.round_reset_used || false);
 
       if (profile?.plan_start_date) {
         setPlanStartDate(profile.plan_start_date);
@@ -293,6 +296,32 @@ export default function DailyReportPage() {
       setPlanRound(newRound);
       setReport((prev) => ({ ...prev, day_number: 1 }));
       setMessage(`第 ${newRound} 輪 21 天計畫已開始！`);
+    }
+    setStartingSaving(false);
+  }
+
+  async function resetCurrentRound() {
+    if (roundResetUsed) return;
+    if (!confirm("確定要重新啟動本輪嗎？天數將歸零從 Day 1 開始，此操作每個帳號僅限一次。")) return;
+
+    setStartingSaving(true);
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { setMessage("登入狀態已過期，請重新登入"); setStartingSaving(false); return; }
+
+    const newStartDate = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" });
+    const { error } = await supabase
+      .from("profiles")
+      .update({ plan_start_date: newStartDate, round_reset_used: true })
+      .eq("id", user.id);
+
+    if (error) {
+      setMessage("重新啟動失敗：" + error.message);
+    } else {
+      setPlanStartDate(newStartDate);
+      setRoundResetUsed(true);
+      setReport((prev) => ({ ...prev, day_number: 1 }));
+      setMessage(`第 ${planRound} 輪已重新啟動！`);
     }
     setStartingSaving(false);
   }
@@ -478,6 +507,20 @@ export default function DailyReportPage() {
                 <p className="text-xs text-yellow-400">
                   {existing ? `正在查看 ${activeDate} 的日報` : `正在補填 ${activeDate} 的日報`}
                 </p>
+              )}
+
+              {/* 重新啟動本輪（第二輪以上，每帳號限一次） */}
+              {planRound >= 2 && !roundResetUsed && (
+                <div className="pt-2 border-t border-border">
+                  <button
+                    type="button"
+                    onClick={resetCurrentRound}
+                    disabled={startingSaving}
+                    className="text-xs text-red-400 hover:text-red-300 transition-colors"
+                  >
+                    {startingSaving ? "重新啟動中..." : `重新啟動第 ${planRound} 輪（限一次）`}
+                  </button>
+                </div>
               )}
             </div>
           );
