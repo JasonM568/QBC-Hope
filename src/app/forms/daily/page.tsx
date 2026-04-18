@@ -138,15 +138,15 @@ export default function DailyReportPage() {
 
   const activeDate = selectedDate || today;
 
-  // 計算指定日期是第幾天（使用純日期字串避免時區問題）
-  function calcDayNumber(startDate: string, round: number, forDate?: string): number {
+  // 計算指定日期是第幾天（每輪從 plan_start_date 起算 Day 1）
+  function calcDayNumber(startDate: string, _round: number, forDate?: string): number {
     const todayStr = forDate || today || new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" });
     const [sy, sm, sd] = startDate.split("-").map(Number);
     const [ty, tm, td] = todayStr.split("-").map(Number);
     const startMs = Date.UTC(sy, sm - 1, sd);
     const targetMs = Date.UTC(ty, tm - 1, td);
     const diff = Math.floor((targetMs - startMs) / (1000 * 60 * 60 * 24));
-    return diff - (round - 1) * 21 + 1;
+    return diff + 1;
   }
 
   // 切換日期時重新載入資料
@@ -280,17 +280,18 @@ export default function DailyReportPage() {
     if (!user) { setMessage("登入狀態已過期，請重新登入"); setStartingSaving(false); return; }
 
     const newRound = planRound + 1;
+    const newStartDate = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" });
     const { error } = await supabase
       .from("profiles")
-      .update({ plan_round: newRound })
+      .update({ plan_round: newRound, plan_start_date: newStartDate })
       .eq("id", user.id);
 
     if (error) {
       setMessage("重新啟動失敗：" + error.message);
     } else {
+      setPlanStartDate(newStartDate);
       setPlanRound(newRound);
-      const dayNum = calcDayNumber(planStartDate!, newRound);
-      setReport((prev) => ({ ...prev, day_number: dayNum > 0 ? dayNum : 1 }));
+      setReport((prev) => ({ ...prev, day_number: 1 }));
       setMessage(`第 ${newRound} 輪 21 天計畫已開始！`);
     }
     setStartingSaving(false);
