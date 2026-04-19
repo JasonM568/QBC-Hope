@@ -12,6 +12,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url, 301);
   }
 
+  // 重設密碼頁面完全跳過 session 處理，避免干擾 token
+  if (request.nextUrl.pathname.startsWith("/auth/reset-password")) {
+    return NextResponse.next();
+  }
+
   return await updateSession(request);
 }
 
