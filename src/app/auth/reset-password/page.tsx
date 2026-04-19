@@ -21,7 +21,7 @@ export default function ResetPasswordPage() {
     const supabase = createClient();
 
     async function handleToken() {
-      // 方式 1：URL query 中有 code（PKCE flow）
+      // 方式 1：URL query 中有 code（PKCE flow / callback redirect）
       const params = new URLSearchParams(window.location.search);
       const code = params.get("code");
       if (code) {
@@ -48,7 +48,6 @@ export default function ResetPasswordPage() {
           return;
         }
 
-        // hash 中有 error
         const hashError = hashParams.get("error_description");
         if (hashError) {
           setError(decodeURIComponent(hashError.replace(/\+/g, " ")));
@@ -56,11 +55,15 @@ export default function ResetPasswordPage() {
         }
       }
 
-      // 方式 3：已經有 session（例如從其他頁面跳轉過來）
+      // 方式 3：已經有 session（經由 /auth/callback 跳轉過來）
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
         setSessionReady(true);
+        return;
       }
+
+      // 都沒有 → 顯示錯誤
+      setError("找不到有效的驗證資訊，請重新從信中的連結進入。");
     }
 
     handleToken();
