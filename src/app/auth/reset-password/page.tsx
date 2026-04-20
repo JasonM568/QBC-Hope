@@ -23,63 +23,97 @@ export default function ResetPasswordPage() {
   const [success, setSuccess] = useState(false);
   const [sessionReady, setSessionReady] = useState(false);
   const [checking, setChecking] = useState(true);
+  const [debugInfo, setDebugInfo] = useState("");
   const router = useRouter();
 
   useEffect(() => {
     const supabase = getRawSupabase();
 
-    async function handleToken() {
-      // 1. URL query 中有 code
-      const params = new URLSearchParams(window.location.search);
-      const code = params.get("code");
-      if (code) {
-        const { error } = await supabase.auth.exchangeCodeForSession(code);
-        if (!error) { setSessionReady(true); }
-        else { setError("連結已過期或無效，請重新申請重設密碼。"); }
-        setChecking(false);
-        return;
-      }
+    // 收集偵錯資訊
+    const search = window.location.search;
+    const hash = window.location.hash;
+    const fullUrl = window.location.href;
+    setDebugInfo(`URL: ${fullUrl}\nsearch: ${search}\nhash: ${hash}`);
+    console.log("[reset-password]", { search, hash, fullUrl });
 
-      // 2. URL hash 中有 access_token
-      const hash = window.location.hash.substring(1);
-      if (hash) {
-        const hp = new URLSearchParams(hash);
-        const at = hp.get("access_token");
-        const rt = hp.get("refresh_token");
-        const errDesc = hp.get("error_description");
-
-        if (at) {
-          const { error } = await supabase.auth.setSession({
-            access_token: at,
-            refresh_token: rt || "",
-          });
-          if (!error) { setSessionReady(true); }
-          else { setError("連結已過期或無效，請重新申請重設密碼。"); }
-          setChecking(false);
-          return;
-        }
-
-        if (errDesc) {
-          setError(decodeURIComponent(errDesc.replace(/\+/g, " ")));
-          setChecking(false);
-          return;
-        }
-      }
-
-      // 3. 已有 session（從 callback 跳轉過來）
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        setSessionReady(true);
-        setChecking(false);
-        return;
-      }
-
-      // 4. 什麼都沒有
-      setError("找不到有效的驗證資訊，請重新從信中的連結進入。");
+    // 5 秒 timeout 保險，避免永遠卡在驗證中
+    const timeoutId = setTimeout(() => {
+      setError("驗證逾時，請重新從信中的連結進入。");
       setChecking(false);
+    }, 5000);
+
+    async function handleToken() {
+      try {
+        // 1. URL query 中有 code
+        const params = new URLSearchParams(window.location.search);
+        const code = params.get("code");
+        if (code) {
+          console.log("[reset-password] found code");
+          const { error } = await supabase.auth.exchangeCodeForSession(code);
+          clearTimeout(timeoutId);
+          if (!error) { setSessionReady(true); }
+          else {
+            console.error("[reset-password] exchangeCodeForSession error", error);
+            setError("連結已過期或無效，請重新申請重設密碼。");
+          }
+          setChecking(false);
+          return;
+        }
+
+        // 2. URL hash 中有 access_token
+        const hashStr = window.location.hash.substring(1);
+        if (hashStr) {
+          const hp = new URLSearchParams(hashStr);
+          const at = hp.get("access_token");
+          const rt = hp.get("refresh_token");
+          const errDesc = hp.get("error_description");
+          console.log("[reset-password] hash params", { at: !!at, rt: !!rt, errDesc });
+
+          if (at) {
+            const { error } = await supabase.auth.setSession({
+              access_token: at,
+              refresh_token: rt || "",
+            });
+            clearTimeout(timeoutId);
+            if (!error) { setSessionReady(true); }
+            else {
+              console.error("[reset-password] setSession error", error);
+              setError("連結已過期或無效，請重新申請重設密碼。");
+            }
+            setChecking(false);
+            return;
+          }
+
+          if (errDesc) {
+            clearTimeout(timeoutId);
+            setError(decodeURIComponent(errDesc.replace(/\+/g, " ")));
+            setChecking(false);
+            return;
+          }
+        }
+
+        // 3. 已有 session
+        const { data: { session } } = await supabase.auth.getSession();
+        clearTimeout(timeoutId);
+        if (session) {
+          setSessionReady(true);
+          setChecking(false);
+          return;
+        }
+
+        // 4. 什麼都沒有
+        setError("找不到有效的驗證資訊，請重新從信中的連結進入。");
+        setChecking(false);
+      } catch (e) {
+        clearTimeout(timeoutId);
+        console.error("[reset-password] exception", e);
+        setError("發生錯誤：" + (e instanceof Error ? e.message : String(e)));
+        setChecking(false);
+      }
     }
 
     handleToken();
+    return () => clearTimeout(timeoutId);
   }, []);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -129,9 +163,17 @@ export default function ResetPasswordPage() {
         ) : error && !sessionReady ? (
           <div className="text-center space-y-4">
             <p className="text-red-400 text-sm">{error}</p>
-            <a href="/auth/forgot-password" className="text-gold hover:underline text-sm">
+            <a href="/auth/forgot-password" className="text-gold hover:underline text-sm block">
               重新發送重設連結
             </a>
+            {debugInfo && (
+              <details className="text-left mt-4">
+                <summary className="text-xs text-muted-foreground cursor-pointer">偵錯資訊（請截圖回報）</summary>
+                <pre className="text-[10px] text-muted-foreground mt-2 p-2 bg-card border border-border rounded whitespace-pre-wrap break-all">
+                  {debugInfo}
+                </pre>
+              </details>
+            )}
           </div>
         ) : sessionReady ? (
           <form onSubmit={handleSubmit} className="space-y-4">
