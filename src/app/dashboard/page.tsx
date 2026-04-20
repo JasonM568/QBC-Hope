@@ -50,15 +50,17 @@ export default async function DashboardPage() {
   }
   const { data: recentReports } = await streakQuery;
 
+  // 計算連續打卡（用台灣時區的純日期字串比對，避免 server UTC 時區誤差）
   let streak = 0;
   if (recentReports && recentReports.length > 0) {
-    const dates = recentReports.map((r) => r.report_date);
-    const checkDate = new Date();
-    for (let i = 0; i < dates.length; i++) {
-      const expected = new Date(checkDate);
-      expected.setDate(expected.getDate() - i);
-      const expectedStr = expected.toISOString().split("T")[0];
-      if (dates.includes(expectedStr)) {
+    const dates = new Set(recentReports.map((r) => r.report_date));
+    // 從今天往前推
+    const [y, m, d] = today.split("-").map(Number);
+    const baseUTC = Date.UTC(y, m - 1, d);
+    for (let i = 0; i < 30; i++) {
+      const t = new Date(baseUTC - i * 86400000);
+      const ds = `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, "0")}-${String(t.getUTCDate()).padStart(2, "0")}`;
+      if (dates.has(ds)) {
         streak++;
       } else {
         break;
