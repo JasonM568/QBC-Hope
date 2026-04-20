@@ -4,7 +4,7 @@ import { useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
-const IDLE_TIMEOUT = 30 * 60 * 1000; // 30 minutes
+const IDLE_TIMEOUT = 30 * 60 * 1000; // 30 分鐘（未勾選保持登入時）
 
 export default function IdleTimeout() {
   const router = useRouter();
@@ -22,6 +22,11 @@ export default function IdleTimeout() {
   }, [handleLogout]);
 
   useEffect(() => {
+    // 勾選「保持登入 21 天」時跳過閒置登出
+    if (typeof window !== "undefined" && localStorage.getItem("hope_keep_logged_in") === "1") {
+      return;
+    }
+
     const events = ["mousedown", "keydown", "scroll", "touchstart"];
     events.forEach((e) => window.addEventListener(e, resetTimer));
     resetTimer();

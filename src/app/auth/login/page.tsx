@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
@@ -32,6 +33,15 @@ function LoginForm() {
       setError(error.message);
       setLoading(false);
       return;
+    }
+
+    // 儲存「保持登入」偏好，給 idle-timeout 用
+    if (typeof window !== "undefined") {
+      if (rememberMe) {
+        localStorage.setItem("hope_keep_logged_in", "1");
+      } else {
+        localStorage.removeItem("hope_keep_logged_in");
+      }
     }
 
     router.push("/dashboard");
@@ -73,6 +83,16 @@ function LoginForm() {
             className="mt-1 bg-card border-border"
           />
         </div>
+
+        <label className="flex items-center gap-2 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={rememberMe}
+            onChange={(e) => setRememberMe(e.target.checked)}
+            className="w-4 h-4 rounded border-border accent-gold"
+          />
+          <span className="text-sm text-muted-foreground">保持登入 21 天</span>
+        </label>
 
         {error && (
           <p className="text-red-400 text-sm">{error}</p>
