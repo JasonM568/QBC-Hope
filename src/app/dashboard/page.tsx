@@ -115,6 +115,26 @@ export default async function DashboardPage() {
           </div>
         </div>
 
+        {/* 量子能量牌卡入口 */}
+        <Link
+          href="/oracle"
+          className="block mt-6 p-5 rounded-xl border border-gold/40 bg-gradient-to-r from-card via-gold/5 to-card card-hover group"
+        >
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h3 className="font-semibold text-gold group-hover:text-gold/90 transition-colors">
+                ✦ 量子能量牌卡抽牌 ✦
+              </h3>
+              <p className="text-muted-foreground text-sm mt-1">
+                AI 結合量子思維與你的日報，為今天的提問做能量解讀
+              </p>
+            </div>
+            <span className="text-gold/60 group-hover:text-gold transition text-xl shrink-0">
+              →
+            </span>
+          </div>
+        </Link>
+
         {/* Five Engines */}
         <h2 className="text-lg font-semibold mt-2 mb-4">五大引擎</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
