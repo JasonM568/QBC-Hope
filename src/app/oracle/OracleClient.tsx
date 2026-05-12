@@ -162,6 +162,27 @@ export default function OracleClient({ initialReading }: Props) {
 
       {/* === IDLE：輸入問題 === */}
       {mode === "idle" && (
+        <>
+          {/* 七日回顧副入口 */}
+          <Link
+            href="/oracle/weekly"
+            className="block rounded-lg border border-gold/40 bg-gradient-to-r from-card via-gold/5 to-card p-4 hover:border-gold transition group"
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium text-gold">
+                  ✦ 看我這 7 天 ✦
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  結合過去 7 天的日報，為這一週做能量回顧
+                </p>
+              </div>
+              <span className="text-gold/60 group-hover:text-gold transition">
+                →
+              </span>
+            </div>
+          </Link>
+
         <section className="space-y-4 rounded-lg border border-border bg-card p-6">
           <div>
             <p className="text-xs text-muted-foreground mb-2">
@@ -206,6 +227,7 @@ export default function OracleClient({ initialReading }: Props) {
           </div>
           {error && <p className="text-sm text-red-400">{error}</p>}
         </section>
+        </>
       )}
 
       {/* === PREPARING：載入 3 張候選 === */}
@@ -535,14 +557,16 @@ function CardFace({ card }: { card: OracleCardLite }) {
  *   - 兩顆按鈕：下載 PNG、下載 PDF
  *   - 用 html2canvas + jspdf 產出檔案
  * ============================================================ */
-function ExportActions({
+export function ExportActions({
   card,
   question,
   aiResponse,
+  mode = "daily",
 }: {
   card: OracleCardLite;
   question: string;
   aiResponse: string;
+  mode?: "daily" | "weekly";
 }) {
   const shareRef = useRef<HTMLDivElement>(null);
   const [exporting, setExporting] = useState<"png" | "pdf" | null>(null);
@@ -655,6 +679,7 @@ function ExportActions({
           question={question}
           aiResponse={aiResponse}
           dateStr={today}
+          mode={mode}
         />
       </div>
     </>
@@ -680,11 +705,13 @@ function ShareCardContent({
   question,
   aiResponse,
   dateStr,
+  mode = "daily",
 }: {
   card: OracleCardLite;
   question: string;
   aiResponse: string;
   dateStr: string;
+  mode?: "daily" | "weekly";
 }) {
   // 分離 AI 解讀本文跟結尾金句（金句的格式為 「...」 —— 顧及然院長）
   const { body, quote } = splitQuote(aiResponse);
@@ -729,7 +756,8 @@ function ShareCardContent({
           letterSpacing: "0.15em",
         }}
       >
-        量子能量牌卡 · #{String(card.card_number).padStart(2, "0")}{" "}
+        {mode === "weekly" ? "七日回顧" : "量子能量牌卡"} · #
+        {String(card.card_number).padStart(2, "0")}{" "}
         <span style={{ color: "#f5deb3", fontWeight: 600 }}>
           {card.card_name}
         </span>
@@ -773,41 +801,45 @@ function ShareCardContent({
         </div>
       </div>
 
-      {/* 提問 */}
-      <div
-        style={{
-          fontSize: 24, // 18pt
-          color: "rgba(212,175,55,0.9)",
-          letterSpacing: "0.2em",
-          marginBottom: 8,
-          fontWeight: 500,
-        }}
-      >
-        ✦ 我的提問 ✦
-      </div>
-      <div
-        style={{
-          fontSize: 16, // 12pt
-          color: "rgba(232,212,154,0.95)",
-          lineHeight: 2.0,
-          paddingBottom: 6,
-          marginBottom: 20,
-        }}
-      >
-        {question}
-      </div>
+      {/* 提問（weekly 模式不顯示） */}
+      {mode === "daily" && (
+        <>
+          <div
+            style={{
+              fontSize: 24,
+              color: "rgba(212,175,55,0.9)",
+              letterSpacing: "0.2em",
+              marginBottom: 8,
+              fontWeight: 500,
+            }}
+          >
+            ✦ 我的提問 ✦
+          </div>
+          <div
+            style={{
+              fontSize: 16,
+              color: "rgba(232,212,154,0.95)",
+              lineHeight: 2.0,
+              paddingBottom: 6,
+              marginBottom: 20,
+            }}
+          >
+            {question}
+          </div>
+        </>
+      )}
 
       {/* 解讀本文 */}
       <div
         style={{
-          fontSize: 24, // 18pt
+          fontSize: 24,
           color: "rgba(212,175,55,0.9)",
           letterSpacing: "0.2em",
           marginBottom: 8,
           fontWeight: 500,
         }}
       >
-        ✦ 牌卡解讀 ✦
+        ✦ {mode === "weekly" ? "七日回顧" : "牌卡解讀"} ✦
       </div>
       <div
         style={{

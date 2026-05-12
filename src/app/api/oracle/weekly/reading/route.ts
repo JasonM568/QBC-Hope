@@ -1,0 +1,164 @@
+import { NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+import { createClient as createServiceRoleClient } from "@supabase/supabase-js";
+import {
+  streamOracleReading,
+  type DailyReportLite,
+  type OracleCard,
+} from "@/lib/oracle/claude";
+import { isOracleUnlimited } from "@/lib/oracle/access";
+
+export const dynamic = "force-dynamic";
+export const maxDuration = 90;
+
+const TIMEZONE = "Asia/Taipei";
+
+interface RequestBody {
+  cardId: number;
+}
+
+/**
+ * 七日回顧 — AI 解讀 API（streaming）
+ *   - 收 cardId
+ *   - 撈過去 7 天日報
+ *   - Claude streaming（type='weekly'，350-450 字）
+ *   - 串完寫入 card_readings (reading_type='weekly', question=null)
+ */
+export async function POST(request: Request) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "未登入" }, { status: 401 });
+  }
+
+  let body: RequestBody;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "請求格式錯誤" }, { status: 400 });
+  }
+
+  const { cardId } = body;
+  if (!cardId) {
+    return NextResponse.json({ error: "缺少 cardId" }, { status: 400 });
+  }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+  const isUnlimited = isOracleUnlimited(profile?.role);
+
+  // 學員：再次防呆（萬一在 draw 跟 reading 之間搶跑）
+  if (!isUnlimited) {
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+      .toISOString();
+    const { data: existing } = await supabase
+      .from("card_readings")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("reading_type", "weekly")
+      .gte("created_at", sevenDaysAgo)
+      .limit(1)
+      .maybeSingle();
+    if (existing) {
+      return NextResponse.json(
+        { error: "你這週已經抽過七日回顧了" },
+        { status: 409 }
+      );
+    }
+  }
+
+  // 撈牌卡
+  const { data: cardRow, error: cardErr } = await supabase
+    .from("oracle_cards")
+    .select("id, card_number, card_name, card_message, keywords")
+    .eq("id", cardId)
+    .single();
+  if (cardErr || !cardRow) {
+    return NextResponse.json({ error: "找不到牌卡" }, { status: 404 });
+  }
+  const card: OracleCard = {
+    card_number: cardRow.card_number,
+    card_name: cardRow.card_name,
+    card_message: cardRow.card_message,
+    keywords: cardRow.keywords ?? [],
+  };
+
+  // 撈過去 7 天日報
+  const sevenAgoDateStr = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+    .toLocaleDateString("en-CA", { timeZone: TIMEZONE });
+  const { data: reportRows } = await supabase
+    .from("daily_reports")
+    .select(
+      "report_date, morning_gratitude, today_goals, action_taken, reflection, energy_level, mood_score"
+    )
+    .eq("user_id", user.id)
+    .gte("report_date", sevenAgoDateStr)
+    .order("report_date", { ascending: false })
+    .limit(7);
+  const recentReports: DailyReportLite[] = reportRows ?? [];
+
+  const encoder = new TextEncoder();
+  const userId = user.id;
+
+  const stream = new ReadableStream({
+    async start(controller) {
+      let fullText = "";
+      try {
+        for await (const chunk of streamOracleReading({
+          type: "weekly",
+          card,
+          recentReports,
+        })) {
+          fullText += chunk;
+          controller.enqueue(encoder.encode(chunk));
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "AI 解讀失敗";
+        console.error("[oracle/weekly/reading] stream error:", err);
+        controller.enqueue(encoder.encode(`\n\n[錯誤] ${msg}`));
+        controller.close();
+        return;
+      }
+
+      // 自動存（service role 避免 RLS 干擾）
+      try {
+        const admin = createServiceRoleClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.SUPABASE_SERVICE_ROLE_KEY!
+        );
+        const { error: insertErr } = await admin
+          .from("card_readings")
+          .insert({
+            user_id: userId,
+            card_id: cardId,
+            question: null,
+            ai_response: fullText,
+            reading_type: "weekly",
+          });
+        if (insertErr) {
+          console.error(
+            "[oracle/weekly/reading] save error:",
+            insertErr.message
+          );
+        }
+      } catch (e) {
+        console.error("[oracle/weekly/reading] save exception:", e);
+      }
+
+      controller.close();
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/plain; charset=utf-8",
+      "Cache-Control": "no-cache, no-transform",
+      "X-Accel-Buffering": "no",
+    },
+  });
+}
