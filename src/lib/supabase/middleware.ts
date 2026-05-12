@@ -36,8 +36,9 @@ export async function updateSession(request: NextRequest) {
     request.nextUrl.pathname === "/";
 
   if (!user && !isPublicRoute) {
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://hope.huangxi.info";
-    return NextResponse.redirect(`${siteUrl}/auth/login`);
+    // 用請求當下的 origin（localhost 跑本機、prod 跑 prod），避免本機 dev 被踢到正式站
+    const loginUrl = new URL("/auth/login", request.url);
+    return NextResponse.redirect(loginUrl);
   }
 
   return supabaseResponse;
