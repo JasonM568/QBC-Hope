@@ -1,6 +1,7 @@
 import { requireRole } from "@/lib/auth-guard";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import Navbar from "@/components/layout/navbar";
+import Link from "next/link";
 import AdminPanel from "./admin-panel";
 
 export default async function AdminPage() {
@@ -53,9 +54,17 @@ export default async function AdminPage() {
     <div className="min-h-screen">
       <Navbar userName={profile.display_name} userRole={viewerRole} />
       <main className="max-w-4xl mx-auto px-4 py-8 pb-24">
-        <h1 className="text-2xl font-bold mb-6">
-          {viewerRole === "admin" ? "管理員後台" : "管理後台"}
-        </h1>
+        <div className="flex items-center justify-between mb-6 gap-3 flex-wrap">
+          <h1 className="text-2xl font-bold">
+            {viewerRole === "admin" ? "管理員後台" : "管理後台"}
+          </h1>
+          <Link
+            href="/admin/points"
+            className="rounded-md border border-gold/50 bg-gold/10 px-4 py-2 text-sm text-gold hover:bg-gold/20 transition"
+          >
+            ✦ 點數管理
+          </Link>
+        </div>
         <AdminPanel
           users={users || []}
           coaches={coaches}

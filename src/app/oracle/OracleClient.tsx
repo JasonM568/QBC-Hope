@@ -13,26 +13,20 @@ export interface OracleCardLite {
   keywords: string[] | null;
 }
 
-export interface ExistingReading {
-  id: string;
-  question: string;
-  ai_response: string;
-  created_at: string;
-  card: OracleCardLite;
-}
-
 type Mode =
   | "idle" // 還沒抽：顯示問題輸入
   | "preparing" // draw API 載入 3 張候選
   | "selecting" // 三張背面，等使用者點
   | "revealing" // 點選後：兩側淡出 + 中間翻面（~1.2s）
   | "reading" // AI 串流中
-  | "done" // 完成
-  | "already"; // 當天已抽過
+  | "done"; // 完成
 
 interface Props {
-  initialReading: ExistingReading | null;
+  initialBalance: number;
+  isUnlimited: boolean;
 }
+
+const DRAW_COST = 2;
 
 const TOPIC_TEMPLATES: { label: string; template: string }[] = [
   {
@@ -57,19 +51,17 @@ const TOPIC_TEMPLATES: { label: string; template: string }[] = [
   },
 ];
 
-export default function OracleClient({ initialReading }: Props) {
-  const initialMode: Mode = initialReading ? "already" : "idle";
-  const [mode, setMode] = useState<Mode>(initialMode);
-  const [question, setQuestion] = useState(initialReading?.question ?? "");
+export default function OracleClient({ initialBalance, isUnlimited }: Props) {
+  const [mode, setMode] = useState<Mode>("idle");
+  const [question, setQuestion] = useState("");
   const [candidates, setCandidates] = useState<OracleCardLite[]>([]);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
-  const [card, setCard] = useState<OracleCardLite | null>(
-    initialReading?.card ?? null
-  );
-  const [aiResponse, setAiResponse] = useState(
-    initialReading?.ai_response ?? ""
-  );
+  const [card, setCard] = useState<OracleCardLite | null>(null);
+  const [aiResponse, setAiResponse] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [balance, setBalance] = useState(initialBalance);
+
+  const insufficient = !isUnlimited && balance < DRAW_COST;
 
   async function handleDraw() {
     setError(null);
@@ -81,20 +73,14 @@ export default function OracleClient({ initialReading }: Props) {
       setError("問題太短了，多寫一點讓 AI 能解讀");
       return;
     }
+    if (insufficient) {
+      setError("點數不足，請聯絡管理員加值");
+      return;
+    }
 
     setMode("preparing");
     try {
       const res = await fetch("/api/oracle/draw", { method: "POST" });
-      if (res.status === 409) {
-        const data = await res.json();
-        if (data.reading) {
-          setCard(data.reading.card);
-          setAiResponse(data.reading.ai_response);
-          setQuestion(data.reading.question);
-          setMode("already");
-          return;
-        }
-      }
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error ?? "抽牌失敗");
@@ -133,7 +119,19 @@ export default function OracleClient({ initialReading }: Props) {
       });
       if (!res.ok || !res.body) {
         const data = await res.json().catch(() => ({}));
+        // 402 點數不足：拉回 idle，提示使用者
+        if (res.status === 402) {
+          setError(data.error ?? "點數不足，請聯絡管理員加值");
+          setMode("idle");
+          setSelectedIndex(null);
+          setCard(null);
+          return;
+        }
         throw new Error(data.error ?? "AI 解讀失敗");
+      }
+      // 後端已扣 2 點，前端餘額同步
+      if (!isUnlimited) {
+        setBalance((b) => Math.max(0, b - DRAW_COST));
       }
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -151,12 +149,32 @@ export default function OracleClient({ initialReading }: Props) {
     }
   }
 
+  function handleResetForNewDraw() {
+    setMode("idle");
+    setQuestion("");
+    setCandidates([]);
+    setSelectedIndex(null);
+    setCard(null);
+    setAiResponse("");
+    setError(null);
+  }
+
   return (
     <div className="space-y-6">
       <header className="text-center space-y-2">
         <h1 className="text-3xl font-bold text-gold-gradient">量子能量牌卡</h1>
         <p className="text-sm text-muted-foreground">
-          每天 1 次｜AI 結合量子思維與你的日報，為今天的提問做出能量解讀
+          {isUnlimited
+            ? "教練／管理員 — 不扣點"
+            : `每次抽牌 −${DRAW_COST} 點｜目前餘額 `}
+          {!isUnlimited && (
+            <Link
+              href="/points"
+              className="text-gold font-semibold hover:underline"
+            >
+              {balance} 點
+            </Link>
+          )}
         </p>
       </header>
 
@@ -219,12 +237,17 @@ export default function OracleClient({ initialReading }: Props) {
             </span>
             <button
               onClick={handleDraw}
-              disabled={!question.trim()}
+              disabled={!question.trim() || insufficient}
               className="rounded-md bg-gold px-4 py-2 text-sm font-medium text-black hover:bg-gold/90 disabled:opacity-40 disabled:cursor-not-allowed transition"
             >
-              展開牌堆
+              展開牌堆{!isUnlimited && ` (−${DRAW_COST} 點)`}
             </button>
           </div>
+          {insufficient && (
+            <p className="text-sm text-yellow-400">
+              ⚠️ 點數不足（需要 {DRAW_COST} 點，目前 {balance} 點）。請聯絡管理員加值，或先去填寫日報領 2 點。
+            </p>
+          )}
           {error && <p className="text-sm text-red-400">{error}</p>}
         </section>
         </>
@@ -276,15 +299,9 @@ export default function OracleClient({ initialReading }: Props) {
         </section>
       )}
 
-      {/* === READING / DONE / ALREADY：顯示牌與解讀 === */}
-      {(mode === "reading" || mode === "done" || mode === "already") && card && (
+      {/* === READING / DONE：顯示牌與解讀 === */}
+      {(mode === "reading" || mode === "done") && card && (
         <section className="space-y-6">
-          {mode === "already" && (
-            <div className="rounded-lg border border-gold/30 bg-card/30 p-3 text-center text-xs text-muted-foreground">
-              ✨ 今天已經抽過牌了。明天再來感應新的能量。
-            </div>
-          )}
-
           <CardFace card={card} />
 
           <div className="rounded-lg border border-border bg-card/50 p-4">
@@ -304,7 +321,7 @@ export default function OracleClient({ initialReading }: Props) {
             </div>
           </div>
 
-          {(mode === "done" || mode === "already") && (
+          {mode === "done" && (
             <>
               <ExportActions
                 card={card}
@@ -312,9 +329,14 @@ export default function OracleClient({ initialReading }: Props) {
                 aiResponse={aiResponse}
               />
               <footer className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
-                <p className="text-sm text-center text-muted-foreground self-center">
-                  明天再來，感應新的能量 🌙
-                </p>
+                <button
+                  onClick={handleResetForNewDraw}
+                  disabled={insufficient}
+                  className="rounded-md bg-gold/90 text-black px-4 py-2 text-sm font-medium hover:bg-gold disabled:opacity-40 disabled:cursor-not-allowed transition"
+                >
+                  ✦ 再抽一次
+                  {!isUnlimited && ` (−${DRAW_COST} 點)`}
+                </button>
                 <Link
                   href="/oracle/history"
                   className="rounded-md border border-border px-4 py-2 text-sm hover:bg-card transition text-center"
@@ -322,6 +344,11 @@ export default function OracleClient({ initialReading }: Props) {
                   看歷史紀錄
                 </Link>
               </footer>
+              {insufficient && (
+                <p className="text-xs text-yellow-400 text-center">
+                  點數不足，請聯絡管理員加值
+                </p>
+              )}
             </>
           )}
         </section>

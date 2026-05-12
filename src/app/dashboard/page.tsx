@@ -76,6 +76,14 @@ export default async function DashboardPage() {
     .order("created_at", { ascending: false })
     .limit(5);
 
+  // Get current point balance (新註冊 trigger 會建一筆；舊用戶會在 SQL migration 補 0）
+  const { data: balanceRow } = await supabase
+    .from("point_balances")
+    .select("balance")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  const pointBalance = balanceRow?.balance ?? 0;
+
   return (
     <div className="min-h-screen">
       <Navbar userName={displayName} userRole={profile?.role} />
@@ -115,25 +123,47 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        {/* 量子能量牌卡入口 */}
-        <Link
-          href="/oracle"
-          className="block mt-6 p-5 rounded-xl border border-gold/40 bg-gradient-to-r from-card via-gold/5 to-card card-hover group"
-        >
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <h3 className="font-semibold text-gold group-hover:text-gold/90 transition-colors">
-                ✦ 量子能量牌卡抽牌 ✦
-              </h3>
-              <p className="text-muted-foreground text-sm mt-1">
-                AI 結合量子思維與你的日報，為今天的提問做能量解讀
-              </p>
+        {/* 量子能量牌卡入口 + 點數存摺 */}
+        <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Link
+            href="/oracle"
+            className="block p-5 rounded-xl border border-gold/40 bg-gradient-to-r from-card via-gold/5 to-card card-hover group"
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h3 className="font-semibold text-gold group-hover:text-gold/90 transition-colors">
+                  ✦ 量子能量牌卡抽牌 ✦
+                </h3>
+                <p className="text-muted-foreground text-sm mt-1">
+                  AI 結合量子思維與你的日報，為今天的提問做能量解讀
+                </p>
+              </div>
+              <span className="text-gold/60 group-hover:text-gold transition text-xl shrink-0">
+                →
+              </span>
             </div>
-            <span className="text-gold/60 group-hover:text-gold transition text-xl shrink-0">
-              →
-            </span>
-          </div>
-        </Link>
+          </Link>
+
+          <Link
+            href="/points"
+            className="block p-5 rounded-xl border border-gold/40 bg-gradient-to-r from-card via-gold/5 to-card card-hover group"
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h3 className="font-semibold text-gold group-hover:text-gold/90 transition-colors">
+                  ✦ 點數存摺 ✦
+                </h3>
+                <p className="text-muted-foreground text-sm mt-1">
+                  抽牌 −2 點｜提交日報 +2 點｜訂閱可加 20 點
+                </p>
+              </div>
+              <div className="text-right shrink-0">
+                <p className="text-3xl font-bold text-gold">{pointBalance}</p>
+                <p className="text-xs text-muted-foreground">點</p>
+              </div>
+            </div>
+          </Link>
+        </div>
 
         {/* Five Engines */}
         <h2 className="text-lg font-semibold mt-2 mb-4">五大引擎</h2>

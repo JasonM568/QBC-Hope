@@ -8,54 +8,43 @@ import {
   type OracleCardLite,
 } from "../OracleClient";
 
-export interface ExistingWeeklyReading {
-  id: string;
-  ai_response: string;
-  created_at: string;
-  card: OracleCardLite;
-}
-
-type Mode = "idle" | "drawing" | "reading" | "done" | "already";
+type Mode = "idle" | "drawing" | "reading" | "done";
 
 interface Props {
-  initialReading: ExistingWeeklyReading | null;
   reportCount: number;
+  initialBalance: number;
+  isUnlimited: boolean;
 }
 
 const WEEKLY_QUESTION_DISPLAY = "過去 7 天的能量回顧";
+const DRAW_COST = 2;
 
 export default function WeeklyOracleClient({
-  initialReading,
   reportCount,
+  initialBalance,
+  isUnlimited,
 }: Props) {
-  const [mode, setMode] = useState<Mode>(
-    initialReading ? "already" : "idle"
-  );
-  const [card, setCard] = useState<OracleCardLite | null>(
-    initialReading?.card ?? null
-  );
-  const [aiResponse, setAiResponse] = useState(
-    initialReading?.ai_response ?? ""
-  );
+  const [mode, setMode] = useState<Mode>("idle");
+  const [card, setCard] = useState<OracleCardLite | null>(null);
+  const [aiResponse, setAiResponse] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [balance, setBalance] = useState(initialBalance);
+
+  const insufficient = !isUnlimited && balance < DRAW_COST;
 
   async function handleStart() {
     setError(null);
+    if (insufficient) {
+      setError("點數不足，請聯絡管理員加值");
+      return;
+    }
+
     setMode("drawing");
 
     try {
       const drawRes = await fetch("/api/oracle/weekly/draw", {
         method: "POST",
       });
-      if (drawRes.status === 409) {
-        const data = await drawRes.json();
-        if (data.reading) {
-          setCard(data.reading.card);
-          setAiResponse(data.reading.ai_response);
-          setMode("already");
-          return;
-        }
-      }
       if (!drawRes.ok) {
         const data = await drawRes.json().catch(() => ({}));
         throw new Error(data.error ?? "抽牌失敗");
@@ -74,7 +63,16 @@ export default function WeeklyOracleClient({
       });
       if (!readRes.ok || !readRes.body) {
         const data = await readRes.json().catch(() => ({}));
+        if (readRes.status === 402) {
+          setError(data.error ?? "點數不足，請聯絡管理員加值");
+          setMode("idle");
+          setCard(null);
+          return;
+        }
         throw new Error(data.error ?? "AI 解讀失敗");
+      }
+      if (!isUnlimited) {
+        setBalance((b) => Math.max(0, b - DRAW_COST));
       }
       const reader = readRes.body.getReader();
       const decoder = new TextDecoder();
@@ -92,6 +90,13 @@ export default function WeeklyOracleClient({
     }
   }
 
+  function handleResetForNewDraw() {
+    setMode("idle");
+    setCard(null);
+    setAiResponse("");
+    setError(null);
+  }
+
   return (
     <div className="space-y-6">
       <header className="text-center space-y-2">
@@ -99,7 +104,17 @@ export default function WeeklyOracleClient({
           ✦ 七日回顧 ✦
         </h1>
         <p className="text-sm text-muted-foreground">
-          結合你過去 7 天的日報，為這一週抽一張牌卡能量總結
+          {isUnlimited
+            ? "教練／管理員 — 不扣點"
+            : `每次抽牌 −${DRAW_COST} 點｜目前餘額 `}
+          {!isUnlimited && (
+            <Link
+              href="/points"
+              className="text-gold font-semibold hover:underline"
+            >
+              {balance} 點
+            </Link>
+          )}
         </p>
       </header>
 
@@ -123,11 +138,18 @@ export default function WeeklyOracleClient({
           <div className="flex justify-center pt-2">
             <button
               onClick={handleStart}
-              className="rounded-md bg-gold px-6 py-3 text-sm font-medium text-black hover:bg-gold/90 transition"
+              disabled={insufficient}
+              className="rounded-md bg-gold px-6 py-3 text-sm font-medium text-black hover:bg-gold/90 disabled:opacity-40 disabled:cursor-not-allowed transition"
             >
-              ✦ 為我抽一張回顧牌 ✦
+              ✦ 為我抽一張回顧牌
+              {!isUnlimited && ` (−${DRAW_COST} 點)`} ✦
             </button>
           </div>
+          {insufficient && (
+            <p className="text-sm text-yellow-400 text-center">
+              ⚠️ 點數不足（需要 {DRAW_COST} 點，目前 {balance} 點）。請聯絡管理員加值，或先去填寫日報領 2 點。
+            </p>
+          )}
           {error && <p className="text-sm text-red-400 text-center">{error}</p>}
         </section>
       )}
@@ -142,15 +164,9 @@ export default function WeeklyOracleClient({
         </section>
       )}
 
-      {/* READING / DONE / ALREADY */}
-      {(mode === "reading" || mode === "done" || mode === "already") && card && (
+      {/* READING / DONE */}
+      {(mode === "reading" || mode === "done") && card && (
         <section className="space-y-6">
-          {mode === "already" && (
-            <div className="rounded-lg border border-gold/30 bg-card/30 p-3 text-center text-xs text-muted-foreground">
-              ✨ 你這週已抽過七日回顧。下次抽牌需要等到 7 天後。
-            </div>
-          )}
-
           <CardFaceWeekly card={card} />
 
           <div className="rounded-lg border border-gold/40 bg-card p-6">
@@ -165,7 +181,7 @@ export default function WeeklyOracleClient({
             </div>
           </div>
 
-          {(mode === "done" || mode === "already") && (
+          {mode === "done" && (
             <>
               <ExportActions
                 card={card}
@@ -174,6 +190,14 @@ export default function WeeklyOracleClient({
                 mode="weekly"
               />
               <footer className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
+                <button
+                  onClick={handleResetForNewDraw}
+                  disabled={insufficient}
+                  className="rounded-md bg-gold/90 text-black px-4 py-2 text-sm font-medium hover:bg-gold disabled:opacity-40 disabled:cursor-not-allowed transition"
+                >
+                  ✦ 再抽一張
+                  {!isUnlimited && ` (−${DRAW_COST} 點)`}
+                </button>
                 <Link
                   href="/oracle"
                   className="rounded-md border border-border px-4 py-2 text-sm hover:bg-card transition text-center"
@@ -187,6 +211,11 @@ export default function WeeklyOracleClient({
                   看歷史紀錄
                 </Link>
               </footer>
+              {insufficient && (
+                <p className="text-xs text-yellow-400 text-center">
+                  點數不足，請聯絡管理員加值
+                </p>
+              )}
             </>
           )}
         </section>

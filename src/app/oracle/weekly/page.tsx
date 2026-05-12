@@ -2,9 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import Navbar from "@/components/layout/navbar";
 import { isOracleUnlimited } from "@/lib/oracle/access";
-import WeeklyOracleClient, {
-  type ExistingWeeklyReading,
-} from "./WeeklyOracleClient";
+import WeeklyOracleClient from "./WeeklyOracleClient";
 
 const TIMEZONE = "Asia/Taipei";
 
@@ -23,31 +21,6 @@ export default async function OracleWeeklyPage() {
 
   const isUnlimited = isOracleUnlimited(profile?.role);
 
-  // 學員：預查本週是否已抽（過去 7 天有沒有 weekly 紀錄）
-  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-    .toISOString();
-
-  const { data: existing } = isUnlimited
-    ? { data: null }
-    : await supabase
-        .from("card_readings")
-        .select(
-          "id, ai_response, created_at, card:oracle_cards(id, card_number, card_name, card_message, card_image_url, keywords)"
-        )
-        .eq("user_id", user.id)
-        .eq("reading_type", "weekly")
-        .gte("created_at", sevenDaysAgo)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-  const normalized: ExistingWeeklyReading | null = existing
-    ? {
-        ...existing,
-        card: Array.isArray(existing.card) ? existing.card[0] : existing.card,
-      }
-    : null;
-
   // 預覽用：抓 7 天日報數量
   const sevenAgoDateStr = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
     .toLocaleDateString("en-CA", { timeZone: TIMEZONE });
@@ -57,6 +30,13 @@ export default async function OracleWeeklyPage() {
     .eq("user_id", user.id)
     .gte("report_date", sevenAgoDateStr);
 
+  const { data: balanceRow } = await supabase
+    .from("point_balances")
+    .select("balance")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  const balance = balanceRow?.balance ?? 0;
+
   return (
     <div className="min-h-screen">
       <Navbar
@@ -65,8 +45,9 @@ export default async function OracleWeeklyPage() {
       />
       <main className="max-w-3xl mx-auto px-4 py-8">
         <WeeklyOracleClient
-          initialReading={normalized}
           reportCount={reportCount ?? 0}
+          initialBalance={balance}
+          isUnlimited={isUnlimited}
         />
       </main>
     </div>

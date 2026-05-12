@@ -11,7 +11,7 @@ import { isOracleUnlimited } from "@/lib/oracle/access";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-const TIMEZONE = "Asia/Taipei";
+const DRAW_COST = 2;
 
 interface RequestBody {
   cardId: number;
@@ -21,10 +21,10 @@ interface RequestBody {
 /**
  * AI 解讀 API（streaming）
  *   - 收 cardId + question
+ *   - 學員：先扣 2 點（餘額不足 402）；coach/admin/master/tester 免扣
  *   - 串流 Claude 回應給前端（純文字 chunks）
  *   - 串完後自動寫入 card_readings
- *
- * 防呆：當天已有紀錄就拒絕（避免重抽鑽漏洞）。
+ *   - 抽牌次數不限（靠點數機制控管）
  */
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -51,40 +51,7 @@ export async function POST(request: Request) {
     );
   }
 
-  // 取 user role：admin / master / tester 免每日 1 次限制
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-  const isUnlimited = isOracleUnlimited(profile?.role);
-
-  // 一般學員：當天已有紀錄就拒
-  if (!isUnlimited) {
-    const todayLocal = new Intl.DateTimeFormat("en-CA", {
-      timeZone: TIMEZONE,
-    }).format(new Date());
-    const dayStart = new Date(`${todayLocal}T00:00:00+08:00`).toISOString();
-    const dayEnd = new Date(`${todayLocal}T23:59:59.999+08:00`).toISOString();
-
-    const { data: existing } = await supabase
-      .from("card_readings")
-      .select("id")
-      .eq("user_id", user.id)
-      .gte("created_at", dayStart)
-      .lte("created_at", dayEnd)
-      .limit(1)
-      .maybeSingle();
-
-    if (existing) {
-      return NextResponse.json(
-        { error: "今天已經抽過牌了，明天再來" },
-        { status: 409 }
-      );
-    }
-  }
-
-  // 撈牌卡
+  // 撈牌卡（順便給扣點的 note 用）
   const { data: cardRow, error: cardErr } = await supabase
     .from("oracle_cards")
     .select("id, card_number, card_name, card_message, keywords")
@@ -101,6 +68,35 @@ export async function POST(request: Request) {
     card_message: cardRow.card_message,
     keywords: cardRow.keywords ?? [],
   };
+
+  // 取 user role：unlimited 角色免扣點
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+  const isUnlimited = isOracleUnlimited(profile?.role);
+
+  // 扣點（在 stream 之前；失敗即拒，避免 LLM 白燒）
+  if (!isUnlimited) {
+    const { error: rpcErr } = await supabase.rpc("consume_points", {
+      p_user_id: user.id,
+      p_amount: DRAW_COST,
+      p_type: "oracle_draw",
+      p_reference_id: null,
+      p_note: `每日抽牌 - ${cardRow.card_name}`,
+    });
+
+    if (rpcErr) {
+      const msg = rpcErr.message ?? "";
+      const isInsufficient =
+        msg.includes("點數餘額不足") || msg.includes("點數不足");
+      return NextResponse.json(
+        { error: isInsufficient ? "點數不足，請聯絡管理員加值" : msg },
+        { status: isInsufficient ? 402 : 500 }
+      );
+    }
+  }
 
   // 撈最近 3 天的日報
   const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000)

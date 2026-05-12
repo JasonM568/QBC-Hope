@@ -12,6 +12,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 90;
 
 const TIMEZONE = "Asia/Taipei";
+const DRAW_COST = 2;
 
 interface RequestBody {
   cardId: number;
@@ -20,6 +21,8 @@ interface RequestBody {
 /**
  * 七日回顧 — AI 解讀 API（streaming）
  *   - 收 cardId
+ *   - 學員扣 2 點；coach/admin/master/tester 免扣
+ *   - 抽牌次數不限（靠點數機制控管）
  *   - 撈過去 7 天日報
  *   - Claude streaming（type='weekly'，350-450 字）
  *   - 串完寫入 card_readings (reading_type='weekly', question=null)
@@ -45,33 +48,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "缺少 cardId" }, { status: 400 });
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-  const isUnlimited = isOracleUnlimited(profile?.role);
-
-  // 學員：再次防呆（萬一在 draw 跟 reading 之間搶跑）
-  if (!isUnlimited) {
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-      .toISOString();
-    const { data: existing } = await supabase
-      .from("card_readings")
-      .select("id")
-      .eq("user_id", user.id)
-      .eq("reading_type", "weekly")
-      .gte("created_at", sevenDaysAgo)
-      .limit(1)
-      .maybeSingle();
-    if (existing) {
-      return NextResponse.json(
-        { error: "你這週已經抽過七日回顧了" },
-        { status: 409 }
-      );
-    }
-  }
-
   // 撈牌卡
   const { data: cardRow, error: cardErr } = await supabase
     .from("oracle_cards")
@@ -87,6 +63,34 @@ export async function POST(request: Request) {
     card_message: cardRow.card_message,
     keywords: cardRow.keywords ?? [],
   };
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+  const isUnlimited = isOracleUnlimited(profile?.role);
+
+  // 扣點（在 stream 之前；失敗即拒）
+  if (!isUnlimited) {
+    const { error: rpcErr } = await supabase.rpc("consume_points", {
+      p_user_id: user.id,
+      p_amount: DRAW_COST,
+      p_type: "oracle_draw",
+      p_reference_id: null,
+      p_note: `七日回顧 - ${cardRow.card_name}`,
+    });
+
+    if (rpcErr) {
+      const msg = rpcErr.message ?? "";
+      const isInsufficient =
+        msg.includes("點數餘額不足") || msg.includes("點數不足");
+      return NextResponse.json(
+        { error: isInsufficient ? "點數不足，請聯絡管理員加值" : msg },
+        { status: isInsufficient ? 402 : 500 }
+      );
+    }
+  }
 
   // 撈過去 7 天日報
   const sevenAgoDateStr = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
