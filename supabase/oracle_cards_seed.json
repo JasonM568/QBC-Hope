@@ -1,0 +1,366 @@
+[
+  {
+    "card_number": 1,
+    "card_name": "圓滿",
+    "image_filename": "01_圓滿.png",
+    "card_message": "圓滿",
+    "keywords": []
+  },
+  {
+    "card_number": 2,
+    "card_name": "喜樂",
+    "image_filename": "02_喜樂.png",
+    "card_message": "喜樂",
+    "keywords": []
+  },
+  {
+    "card_number": 3,
+    "card_name": "困境",
+    "image_filename": "03_困境.png",
+    "card_message": "困境",
+    "keywords": []
+  },
+  {
+    "card_number": 4,
+    "card_name": "宿命",
+    "image_filename": "04_宿命.png",
+    "card_message": "宿命",
+    "keywords": []
+  },
+  {
+    "card_number": 5,
+    "card_name": "感謝",
+    "image_filename": "05_感謝.png",
+    "card_message": "感謝",
+    "keywords": []
+  },
+  {
+    "card_number": 6,
+    "card_name": "連結",
+    "image_filename": "06_連結.png",
+    "card_message": "連結",
+    "keywords": []
+  },
+  {
+    "card_number": 7,
+    "card_name": "超值",
+    "image_filename": "07_超值.png",
+    "card_message": "超值",
+    "keywords": []
+  },
+  {
+    "card_number": 8,
+    "card_name": "供給",
+    "image_filename": "08_供給.png",
+    "card_message": "供給",
+    "keywords": []
+  },
+  {
+    "card_number": 9,
+    "card_name": "傷痕",
+    "image_filename": "09_傷痕.png",
+    "card_message": "傷痕",
+    "keywords": []
+  },
+  {
+    "card_number": 10,
+    "card_name": "創富",
+    "image_filename": "10_創富.png",
+    "card_message": "創富",
+    "keywords": []
+  },
+  {
+    "card_number": 11,
+    "card_name": "盛開",
+    "image_filename": "11_盛開.png",
+    "card_message": "盛開",
+    "keywords": []
+  },
+  {
+    "card_number": 12,
+    "card_name": "天賦",
+    "image_filename": "12_天賦.png",
+    "card_message": "天賦",
+    "keywords": []
+  },
+  {
+    "card_number": 13,
+    "card_name": "爭搶",
+    "image_filename": "13_爭搶.png",
+    "card_message": "爭搶",
+    "keywords": []
+  },
+  {
+    "card_number": 14,
+    "card_name": "操控",
+    "image_filename": "14_操控.png",
+    "card_message": "操控",
+    "keywords": []
+  },
+  {
+    "card_number": 15,
+    "card_name": "過去",
+    "image_filename": "15_過去.png",
+    "card_message": "過去",
+    "keywords": []
+  },
+  {
+    "card_number": 16,
+    "card_name": "知行",
+    "image_filename": "16_知行.png",
+    "card_message": "知行",
+    "keywords": []
+  },
+  {
+    "card_number": 17,
+    "card_name": "信心",
+    "image_filename": "17_信心.png",
+    "card_message": "信心",
+    "keywords": []
+  },
+  {
+    "card_number": 18,
+    "card_name": "思想",
+    "image_filename": "18_思想.png",
+    "card_message": "思想",
+    "keywords": []
+  },
+  {
+    "card_number": 19,
+    "card_name": "渴望",
+    "image_filename": "19_渴望.png",
+    "card_message": "渴望",
+    "keywords": []
+  },
+  {
+    "card_number": 20,
+    "card_name": "支持",
+    "image_filename": "20_支持.png",
+    "card_message": "支持",
+    "keywords": []
+  },
+  {
+    "card_number": 21,
+    "card_name": "意志",
+    "image_filename": "21_意志.png",
+    "card_message": "意志",
+    "keywords": []
+  },
+  {
+    "card_number": 22,
+    "card_name": "貧窮",
+    "image_filename": "22_貧窮.png",
+    "card_message": "貧窮",
+    "keywords": []
+  },
+  {
+    "card_number": 23,
+    "card_name": "決心",
+    "image_filename": "23_決心.png",
+    "card_message": "決心",
+    "keywords": []
+  },
+  {
+    "card_number": 24,
+    "card_name": "校準",
+    "image_filename": "24_校準.png",
+    "card_message": "校準",
+    "keywords": []
+  },
+  {
+    "card_number": 25,
+    "card_name": "成長",
+    "image_filename": "25_成長.png",
+    "card_message": "成長",
+    "keywords": []
+  },
+  {
+    "card_number": 26,
+    "card_name": "羅盤",
+    "image_filename": "26_羅盤.png",
+    "card_message": "羅盤",
+    "keywords": []
+  },
+  {
+    "card_number": 27,
+    "card_name": "感恩",
+    "image_filename": "27_感恩.png",
+    "card_message": "感恩",
+    "keywords": []
+  },
+  {
+    "card_number": 28,
+    "card_name": "效率",
+    "image_filename": "28_效率.png",
+    "card_message": "效率",
+    "keywords": []
+  },
+  {
+    "card_number": 29,
+    "card_name": "創造",
+    "image_filename": "29_創造.png",
+    "card_message": "創造",
+    "keywords": []
+  },
+  {
+    "card_number": 30,
+    "card_name": "豐盛",
+    "image_filename": "30_豐盛.png",
+    "card_message": "豐盛",
+    "keywords": []
+  },
+  {
+    "card_number": 31,
+    "card_name": "許願",
+    "image_filename": "31_許願.png",
+    "card_message": "許願",
+    "keywords": []
+  },
+  {
+    "card_number": 32,
+    "card_name": "願景",
+    "image_filename": "32_願景.png",
+    "card_message": "願景",
+    "keywords": []
+  },
+  {
+    "card_number": 33,
+    "card_name": "心築",
+    "image_filename": "33_心築.png",
+    "card_message": "心築",
+    "keywords": []
+  },
+  {
+    "card_number": 34,
+    "card_name": "極致",
+    "image_filename": "34_極致.png",
+    "card_message": "極致",
+    "keywords": []
+  },
+  {
+    "card_number": 35,
+    "card_name": "配備",
+    "image_filename": "35_配備.png",
+    "card_message": "配備",
+    "keywords": []
+  },
+  {
+    "card_number": 36,
+    "card_name": "工具",
+    "image_filename": "36_工具.png",
+    "card_message": "工具",
+    "keywords": []
+  },
+  {
+    "card_number": 37,
+    "card_name": "理想",
+    "image_filename": "37_理想.png",
+    "card_message": "理想",
+    "keywords": []
+  },
+  {
+    "card_number": 38,
+    "card_name": "相信",
+    "image_filename": "38_相信.png",
+    "card_message": "相信",
+    "keywords": []
+  },
+  {
+    "card_number": 39,
+    "card_name": "懷疑",
+    "image_filename": "39_懷疑.png",
+    "card_message": "懷疑",
+    "keywords": []
+  },
+  {
+    "card_number": 40,
+    "card_name": "失敗",
+    "image_filename": "40_失敗.png",
+    "card_message": "失敗",
+    "keywords": []
+  },
+  {
+    "card_number": 41,
+    "card_name": "潛能",
+    "image_filename": "41_潛能.png",
+    "card_message": "潛能",
+    "keywords": []
+  },
+  {
+    "card_number": 42,
+    "card_name": "升級",
+    "image_filename": "42_升級.png",
+    "card_message": "升級",
+    "keywords": []
+  },
+  {
+    "card_number": 43,
+    "card_name": "時局",
+    "image_filename": "43_時局.png",
+    "card_message": "時局",
+    "keywords": []
+  },
+  {
+    "card_number": 44,
+    "card_name": "挑戰",
+    "image_filename": "44_挑戰.png",
+    "card_message": "挑戰",
+    "keywords": []
+  },
+  {
+    "card_number": 45,
+    "card_name": "粉絲",
+    "image_filename": "45_粉絲.png",
+    "card_message": "粉絲",
+    "keywords": []
+  },
+  {
+    "card_number": 46,
+    "card_name": "羨慕",
+    "image_filename": "46_羨慕.png",
+    "card_message": "羨慕",
+    "keywords": []
+  },
+  {
+    "card_number": 47,
+    "card_name": "無畏",
+    "image_filename": "47_無畏.png",
+    "card_message": "無畏",
+    "keywords": []
+  },
+  {
+    "card_number": 48,
+    "card_name": "突破",
+    "image_filename": "48_突破.png",
+    "card_message": "突破",
+    "keywords": []
+  },
+  {
+    "card_number": 49,
+    "card_name": "當下",
+    "image_filename": "49_當下.png",
+    "card_message": "當下",
+    "keywords": []
+  },
+  {
+    "card_number": 50,
+    "card_name": "致富",
+    "image_filename": "50_致富.png",
+    "card_message": "致富",
+    "keywords": []
+  },
+  {
+    "card_number": 51,
+    "card_name": "想像",
+    "image_filename": "51_想像.png",
+    "card_message": "想像",
+    "keywords": []
+  },
+  {
+    "card_number": 52,
+    "card_name": "踏實",
+    "image_filename": "52_踏實.png",
+    "card_message": "踏實",
+    "keywords": []
+  }
+]

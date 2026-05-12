@@ -15,6 +15,7 @@ const allStudentItems = [
   { href: "/forms/strategy", label: "戰略定位", moduleKey: "strategy" },
   { href: "/history", label: "成長曲線" },
   { href: "/community", label: "打卡牆" },
+  { href: "/oracle", label: "能量牌卡" },
 ];
 
 const coachItems = [

@@ -41,3 +41,6 @@ supabase/.temp/
 # handoff (私人交接紀錄，不上傳)
 HANDOFF.md
 
+# 量子能量牌卡原始素材（圖片已上 Supabase Storage，docx 已轉成程式內知識庫）
+/量子能量牌卡/
+

@@ -2,7 +2,9 @@
 
 ## 概述
 
-提供 64 張量子能量牌卡，學員輸入問題後隨機抽取一張牌卡，系統結合牌卡訊息與學員的問題，透過 AI 進行解讀回覆。類似廟宇抽籤詩或塔羅牌的體驗，但由 AI 擔任解讀者。
+提供 **52 張**量子能量牌卡，學員輸入問題後隨機抽取一張牌卡，系統結合牌卡訊息與學員的問題，透過 AI 進行解讀回覆。類似廟宇抽籤詩或塔羅牌的體驗，但由 AI 擔任解讀者。
+
+> 註：本 SPEC 原稿寫 64 張，實際牌卡資產為 52 張（編號 01_圓滿 ~ 52_踏實），以實際資產為準。
 
 ---
 
@@ -22,9 +24,9 @@
 
 ## 牌卡資料
 
-### 64 張量子能量牌卡
+### 52 張量子能量牌卡
 - 每張牌卡包含：
-  - 編號（1-64）
+  - 編號（1-52）
   - 牌卡名稱
   - 牌面圖片（可選，若無則使用預設樣式）
   - 牌面文字（一小段啟示性的話語）
@@ -39,11 +41,11 @@
 
 ## 資料庫設計
 
-### oracle_cards 表（64 張牌卡資料）
+### oracle_cards 表（52 張牌卡資料）
 ```sql
 CREATE TABLE oracle_cards (
   id SERIAL PRIMARY KEY,
-  card_number INTEGER NOT NULL UNIQUE,           -- 編號 1-64
+  card_number INTEGER NOT NULL UNIQUE,           -- 編號 1-52
   card_name TEXT NOT NULL,                        -- 牌卡名稱
   card_message TEXT NOT NULL,                     -- 牌面文字（一段話）
   card_image_url TEXT,                            -- 牌卡圖片 URL（可選）
@@ -196,7 +198,8 @@ CREATE INDEX idx_card_readings_user ON card_readings(user_id, created_at DESC);
 
 ## 待確認事項
 
-- [ ] 64 張牌卡的完整內容（名稱 + 文字）
+- [x] 52 張牌卡的名稱 ✅（已從圖檔抽取）
+- [ ] 52 張牌卡的「牌面文字」完整內容（首版以牌名當 placeholder）
 - [ ] 牌卡圖片素材
 - [ ] AI 解讀的語氣風格（溫暖鼓勵 / 直接分析 / 神秘玄學）
 - [ ] 每日抽牌次數限制
