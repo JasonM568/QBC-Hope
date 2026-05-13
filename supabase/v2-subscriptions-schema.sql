@@ -5,7 +5,7 @@
 --
 -- 涵蓋兩張表：
 --   1. subscriptions    訂閱合約（trial 21 天 / monthly 定期定額 / annual 一次性）
---   2. purchase_orders  一次性訂單（trial / annual / 加購點數三包）
+--   2. hope_purchase_orders  一次性訂單（trial / annual / 加購點數三包）
 --
 -- 兩張表都包含：
 --   - 綠界金流欄位（merchant_trade_no、trade_no、ecpay_agreement_no）
@@ -85,7 +85,7 @@ CREATE INDEX IF NOT EXISTS idx_subscriptions_agreement_no
   ON subscriptions(ecpay_agreement_no) WHERE ecpay_agreement_no IS NOT NULL;
 
 -- =============================================
--- 2. purchase_orders：一次性訂單
+-- 2. hope_purchase_orders：一次性訂單
 --
 -- 涵蓋：
 --   - subscription_trial   體驗方案 $99 / 21 天
@@ -94,7 +94,7 @@ CREATE INDEX IF NOT EXISTS idx_subscriptions_agreement_no
 --
 -- 月繳付款記錄寫進 subscriptions 本身（合約導向），不重複寫這裡。
 -- =============================================
-CREATE TABLE IF NOT EXISTS purchase_orders (
+CREATE TABLE IF NOT EXISTS hope_purchase_orders (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
 
@@ -137,20 +137,20 @@ CREATE TABLE IF NOT EXISTS purchase_orders (
 
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 
-  CONSTRAINT purchase_orders_tax_id_format CHECK (
+  CONSTRAINT hope_purchase_orders_tax_id_format CHECK (
     buyer_tax_id IS NULL OR buyer_tax_id ~ '^[0-9]{8}$'
   ),
-  CONSTRAINT purchase_orders_donation_code_format CHECK (
+  CONSTRAINT hope_purchase_orders_donation_code_format CHECK (
     donation_code IS NULL OR donation_code ~ '^[0-9]{3,7}$'
   )
 );
 
-CREATE INDEX IF NOT EXISTS idx_purchase_orders_user
-  ON purchase_orders(user_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_purchase_orders_status
-  ON purchase_orders(payment_status);
-CREATE INDEX IF NOT EXISTS idx_purchase_orders_trade_no
-  ON purchase_orders(trade_no) WHERE trade_no IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_hope_purchase_orders_user
+  ON hope_purchase_orders(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_hope_purchase_orders_status
+  ON hope_purchase_orders(payment_status);
+CREATE INDEX IF NOT EXISTS idx_hope_purchase_orders_trade_no
+  ON hope_purchase_orders(trade_no) WHERE trade_no IS NOT NULL;
 
 -- =============================================
 -- RLS
@@ -160,7 +160,7 @@ CREATE INDEX IF NOT EXISTS idx_purchase_orders_trade_no
 -- 不開放 INSERT/UPDATE/DELETE policy = 預設拒絕。
 -- =============================================
 ALTER TABLE subscriptions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE purchase_orders ENABLE ROW LEVEL SECURITY;
+ALTER TABLE hope_purchase_orders ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "view own subscriptions, admin all" ON subscriptions;
 CREATE POLICY "view own subscriptions, admin all"
@@ -173,9 +173,9 @@ CREATE POLICY "view own subscriptions, admin all"
     )
   );
 
-DROP POLICY IF EXISTS "view own orders, admin all" ON purchase_orders;
+DROP POLICY IF EXISTS "view own orders, admin all" ON hope_purchase_orders;
 CREATE POLICY "view own orders, admin all"
-  ON purchase_orders FOR SELECT
+  ON hope_purchase_orders FOR SELECT
   USING (
     auth.uid() = user_id
     OR EXISTS (
@@ -199,5 +199,5 @@ SELECT
 FROM pg_class c
 JOIN pg_namespace n ON n.oid = c.relnamespace
 WHERE n.nspname = 'public'
-  AND c.relname IN ('subscriptions', 'purchase_orders')
+  AND c.relname IN ('subscriptions', 'hope_purchase_orders')
 ORDER BY c.relname;
