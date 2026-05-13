@@ -3,23 +3,40 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import Navbar from "@/components/layout/navbar";
 
+type PointTxType =
+  | "signup_bonus"
+  | "daily_report"
+  | "oracle_draw"
+  | "admin_adjust"
+  | "streak_7"
+  | "streak_21"
+  | "subscription"
+  | "subscription_monthly"
+  | "purchase_99"
+  | "purchase_199"
+  | "purchase_499";
+
 interface PointTx {
   id: string;
-  type: "signup_bonus" | "daily_report" | "oracle_draw" | "admin_adjust";
+  type: PointTxType;
   amount: number;
   balance_after: number;
   note: string | null;
   created_at: string;
 }
 
-const TYPE_META: Record<
-  PointTx["type"],
-  { label: string; tone: "earn" | "spend" }
-> = {
+const TYPE_META: Record<PointTxType, { label: string; tone: "earn" | "spend" }> = {
   signup_bonus: { label: "新註冊體驗額度", tone: "earn" },
   daily_report: { label: "提交日報", tone: "earn" },
   admin_adjust: { label: "管理員加值", tone: "earn" },
   oracle_draw: { label: "牌卡抽牌", tone: "spend" },
+  streak_7: { label: "連續 7 天獎勵", tone: "earn" },
+  streak_21: { label: "21 天里程碑", tone: "earn" },
+  subscription: { label: "訂閱發點", tone: "earn" },
+  subscription_monthly: { label: "年繳每月補點", tone: "earn" },
+  purchase_99: { label: "加購體驗包", tone: "earn" },
+  purchase_199: { label: "加購標準包", tone: "earn" },
+  purchase_499: { label: "加購大包", tone: "earn" },
 };
 
 export default async function PointsPage() {
@@ -31,9 +48,12 @@ export default async function PointsPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("display_name, role")
+    .select("display_name, role, current_streak, longest_streak, last_report_date")
     .eq("id", user.id)
     .single();
+
+  const currentStreak = profile?.current_streak ?? 0;
+  const longestStreak = profile?.longest_streak ?? 0;
 
   const { data: balanceRow } = await supabase
     .from("point_balances")
@@ -69,7 +89,7 @@ export default async function PointsPage() {
         <header className="text-center space-y-2">
           <h1 className="text-3xl font-bold text-gold-gradient">點數存摺</h1>
           <p className="text-sm text-muted-foreground">
-            抽牌 −2 點｜提交日報 +2 點｜每月訂閱可由管理員加 20 點
+            抽牌 −2 點｜日報 +1 點｜連續 7 天 +3｜21 天里程碑 +10
           </p>
         </header>
 
@@ -90,6 +110,31 @@ export default async function PointsPage() {
               <p className="text-lg font-semibold text-red-400">
                 −{totalSpent}
               </p>
+            </div>
+          </div>
+        </section>
+
+        {/* 連續打卡卡片 */}
+        <section className="rounded-xl border border-border bg-card p-6">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm text-muted-foreground">連續打卡</p>
+              <p className="text-3xl font-bold mt-1">
+                <span className="text-gold">{currentStreak}</span>
+                <span className="text-base font-normal text-muted-foreground"> 天 🔥</span>
+              </p>
+              <p className="text-xs text-muted-foreground mt-2">
+                {currentStreak === 0
+                  ? "今天交一份日報就能開始連續紀錄"
+                  : currentStreak >= 21
+                    ? "已達 21 天里程碑，繼續維持！"
+                    : `再 ${7 - (currentStreak % 7)} 天可拿 +3 點 streak 獎勵`}
+              </p>
+            </div>
+            <div className="text-right shrink-0">
+              <p className="text-xs text-muted-foreground">最長紀錄</p>
+              <p className="text-2xl font-semibold text-gold mt-1">{longestStreak}</p>
+              <p className="text-xs text-muted-foreground">天</p>
             </div>
           </div>
         </section>

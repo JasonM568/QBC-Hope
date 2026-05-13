@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import Navbar from "@/components/layout/navbar";
+import V2PointsBanner from "@/components/v2-points-banner";
 import Link from "next/link";
 
 export default async function DashboardPage() {
@@ -89,6 +90,9 @@ export default async function DashboardPage() {
       <Navbar userName={displayName} userRole={profile?.role} />
 
       <main className="max-w-6xl mx-auto px-4 py-8">
+        {/* v2 點數規則一次性公告 */}
+        <V2PointsBanner />
+
         {/* Welcome */}
         <div className="mb-8">
           <h1 className="text-2xl font-bold">
