@@ -241,10 +241,10 @@ CREATE POLICY "Users can view own subscriptions" ON subscriptions
   );
 ```
 
-### 4.4 新增 purchase_orders 資料表（一次性訂單：訂閱方案 + 點數加購）
+### 4.4 新增 hope_purchase_orders 資料表（一次性訂單：訂閱方案 + 點數加購）
 
 ```sql
-CREATE TABLE IF NOT EXISTS purchase_orders (
+CREATE TABLE IF NOT EXISTS hope_purchase_orders (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   user_id UUID REFERENCES profiles(id) NOT NULL,
   order_type TEXT NOT NULL
@@ -276,13 +276,13 @@ CREATE TABLE IF NOT EXISTS purchase_orders (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_purchase_orders_user ON purchase_orders(user_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_purchase_orders_status ON purchase_orders(payment_status);
+CREATE INDEX IF NOT EXISTS idx_hope_purchase_orders_user ON hope_purchase_orders(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_hope_purchase_orders_status ON hope_purchase_orders(payment_status);
 
-ALTER TABLE purchase_orders ENABLE ROW LEVEL SECURITY;
+ALTER TABLE hope_purchase_orders ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "Users can view own orders" ON purchase_orders;
-CREATE POLICY "Users can view own orders" ON purchase_orders
+DROP POLICY IF EXISTS "Users can view own orders" ON hope_purchase_orders;
+CREATE POLICY "Users can view own orders" ON hope_purchase_orders
   FOR SELECT USING (
     auth.uid() = user_id
     OR EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'master'))
@@ -466,7 +466,7 @@ CREATE TRIGGER on_daily_report_insert
 1. 第四節 4.1：`profiles` 新增欄位
 2. 第四節 4.2：`point_transactions` 更新 type constraint
 3. 第四節 4.3：建立 `subscriptions` 資料表
-4. 第四節 4.4：建立 `purchase_orders` 資料表
+4. 第四節 4.4：建立 `hope_purchase_orders` 資料表
 5. 第四節 4.5：替換 `daily_reports` trigger
 
 確認方式：
@@ -632,7 +632,7 @@ v2 全套切成 10 個 Claude Code session 並行/序列執行（詳細任務見
 
 ### 8.4 發票記錄
 
-- 開立成功後綠界 callback 回傳發票號碼 → 寫進 `subscriptions.invoice_number` 或 `purchase_orders.invoice_number`
+- 開立成功後綠界 callback 回傳發票號碼 → 寫進 `subscriptions.invoice_number` 或 `hope_purchase_orders.invoice_number`
 - 發票寄送：綠界自動寄到 `buyer_email`
 - 用戶可在 `/subscription` 看到自己的發票號碼
 
@@ -652,7 +652,7 @@ v2 全套切成 10 個 Claude Code session 並行/序列執行（詳細任務見
 **權限**：admin / master
 
 **功能**：
-- 訂閱訂單清單（從 `subscriptions` + `purchase_orders` 兩表 union）
+- 訂閱訂單清單（從 `subscriptions` + `hope_purchase_orders` 兩表 union）
 - 篩選器：
   - 訂閱狀態（active / queued / cancelling / expired / cancelled）
   - 訂單類型（trial / monthly / annual / points_*）
