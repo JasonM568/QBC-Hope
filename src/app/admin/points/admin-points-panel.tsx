@@ -17,6 +17,23 @@ interface Props {
 
 const PRESET_AMOUNTS = [20, 4, -2, -20];
 
+function getPresetNote(amount: number): string {
+  const now = new Date();
+  const yyyymm = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  switch (amount) {
+    case 20:
+      return `月費 199 入帳 ${yyyymm}`;
+    case 4:
+      return "補發簽到禮";
+    case -2:
+      return "手動扣除";
+    case -20:
+      return "退費";
+    default:
+      return "";
+  }
+}
+
 export default function AdminPointsPanel({ students }: Props) {
   const router = useRouter();
   const [filter, setFilter] = useState("");
@@ -87,7 +104,7 @@ export default function AdminPointsPanel({ students }: Props) {
     <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
       {/* 左：學員清單 */}
       <div className="space-y-3">
-        <h2 className="text-lg font-semibold">學員列表</h2>
+        <h2 className="text-lg font-semibold">成員列表</h2>
         <input
           type="text"
           value={filter}
@@ -97,7 +114,7 @@ export default function AdminPointsPanel({ students }: Props) {
         />
         <div className="rounded-lg border border-border bg-card divide-y divide-border max-h-[480px] overflow-y-auto">
           {filtered.length === 0 ? (
-            <p className="p-4 text-sm text-muted-foreground">查無學員</p>
+            <p className="p-4 text-sm text-muted-foreground">查無成員</p>
           ) : (
             filtered.map((s) => {
               const isSelected = s.id === selectedId;
@@ -159,7 +176,10 @@ export default function AdminPointsPanel({ students }: Props) {
                     <button
                       key={n}
                       type="button"
-                      onClick={() => setAmount(n)}
+                      onClick={() => {
+                        setAmount(n);
+                        setNote(getPresetNote(n));
+                      }}
                       className={`rounded-md border px-3 py-1 text-xs transition ${
                         amount === n
                           ? "border-gold bg-gold/10 text-gold"
@@ -210,7 +230,7 @@ export default function AdminPointsPanel({ students }: Props) {
             </>
           ) : (
             <p className="text-sm text-muted-foreground text-center py-8">
-              請從左邊選一位學員開始
+              請從左邊選一位成員開始
             </p>
           )}
         </div>

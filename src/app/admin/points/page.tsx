@@ -10,11 +10,11 @@ export default async function AdminPointsPage() {
 
   const admin = createServiceRoleClient();
 
-  // 取所有學員 + 點數餘額
+  // 取所有成員 + 點數餘額（含 admin / master / tester，方便管理員調整內部帳號）
   const { data: profiles } = await admin
     .from("profiles")
     .select("id, display_name, email, role")
-    .in("role", ["student", "coach"])
+    .in("role", ["student", "coach", "admin", "master", "tester"])
     .order("created_at", { ascending: false });
 
   const ids = (profiles ?? []).map((p) => p.id);
@@ -60,7 +60,7 @@ export default async function AdminPointsPage() {
         <header className="space-y-1">
           <h1 className="text-2xl font-bold">點數管理</h1>
           <p className="text-sm text-muted-foreground">
-            每月訂閱付款後在這裡幫學員加 20 點（type = admin_adjust），所有異動寫入流水可追溯。
+            每月訂閱付款後在這裡幫成員加 20 點（type = admin_adjust），所有異動寫入流水可追溯。
           </p>
         </header>
 
