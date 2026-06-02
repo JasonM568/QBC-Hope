@@ -58,12 +58,20 @@ export default async function AdminPage() {
           <h1 className="text-2xl font-bold">
             {viewerRole === "admin" ? "管理員後台" : "管理後台"}
           </h1>
-          <Link
-            href="/admin/points"
-            className="rounded-md border border-gold/50 bg-gold/10 px-4 py-2 text-sm text-gold hover:bg-gold/20 transition"
-          >
-            ✦ 點數管理
-          </Link>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Link
+              href="/admin/courses"
+              className="rounded-md border border-gold/50 bg-gold/10 px-4 py-2 text-sm text-gold hover:bg-gold/20 transition"
+            >
+              ✦ 課程管理
+            </Link>
+            <Link
+              href="/admin/points"
+              className="rounded-md border border-gold/50 bg-gold/10 px-4 py-2 text-sm text-gold hover:bg-gold/20 transition"
+            >
+              ✦ 點數管理
+            </Link>
+          </div>
         </div>
         <AdminPanel
           users={users || []}
