@@ -34,6 +34,9 @@ export default function RegisterPage() {
       email,
       password,
       options: {
+        // 信件模板的連結是 {{ .RedirectTo }}?token_hash=...&type=signup&next=/dashboard
+        // 這裡指定 emailRedirectTo，{{ .RedirectTo }} 才會是本站的 /auth/confirm（而非退回首頁）
+        emailRedirectTo: `${window.location.origin}/auth/confirm`,
         data: {
           display_name: name.trim(),
           nickname: nickname.trim() || null,
