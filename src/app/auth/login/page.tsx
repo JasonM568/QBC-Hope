@@ -17,6 +17,12 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const reason = searchParams.get("reason");
+  const linkErrorRaw = searchParams.get("error");
+  const linkError = linkErrorRaw
+    ? linkErrorRaw === "invalid_link" || /expired|invalid/i.test(linkErrorRaw)
+      ? "連結已過期或無效，請重新申請。"
+      : linkErrorRaw
+    : "";
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -30,7 +36,14 @@ function LoginForm() {
     });
 
     if (error) {
-      setError(error.message);
+      // 信箱尚未驗證：給明確指引
+      if (/email not confirmed/i.test(error.message)) {
+        setError("此帳號的信箱尚未驗證，請到信箱點擊啟用連結後再登入。");
+      } else if (/invalid login credentials/i.test(error.message)) {
+        setError("Email 或密碼錯誤，請重新確認。");
+      } else {
+        setError(error.message);
+      }
       setLoading(false);
       return;
     }
@@ -55,6 +68,9 @@ function LoginForm() {
         <p className="text-muted-foreground mt-2">登入你的帳號</p>
         {reason === "idle" && (
           <p className="mt-3 text-yellow-400 text-sm">因閒置過久已自動登出，請重新登入</p>
+        )}
+        {linkError && (
+          <p className="mt-3 text-red-400 text-sm">{linkError}</p>
         )}
       </div>
 

@@ -2,18 +2,11 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { createClient as createBrowserClient } from "@supabase/supabase-js";
+import type { EmailOtpType } from "@supabase/supabase-js";
+import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-
-// 直接用 supabase-js 建立 client（繞過 @supabase/ssr 的 cookie 處理）
-function getRawSupabase() {
-  return createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
-}
 
 export default function ResetPasswordPage() {
   const [password, setPassword] = useState("");
@@ -27,7 +20,7 @@ export default function ResetPasswordPage() {
   const router = useRouter();
 
   useEffect(() => {
-    const supabase = getRawSupabase();
+    const supabase = createClient();
 
     // 收集偵錯資訊
     const search = window.location.search;
@@ -44,8 +37,33 @@ export default function ResetPasswordPage() {
 
     async function handleToken() {
       try {
-        // 1. URL query 中有 code
         const params = new URLSearchParams(window.location.search);
+
+        // 0. 已由 /auth/confirm 完成驗證並轉址過來：session 已在 cookie
+        const { data: { session: existing } } = await supabase.auth.getSession();
+        if (existing) {
+          clearTimeout(timeoutId);
+          setSessionReady(true);
+          setChecking(false);
+          return;
+        }
+
+        // 1a. 新版信件連結直接帶 token_hash + type=recovery（備援）
+        const tokenHash = params.get("token_hash");
+        const type = params.get("type") as EmailOtpType | null;
+        if (tokenHash && type) {
+          const { error } = await supabase.auth.verifyOtp({ type, token_hash: tokenHash });
+          clearTimeout(timeoutId);
+          if (!error) { setSessionReady(true); }
+          else {
+            console.error("[reset-password] verifyOtp error", error);
+            setError("連結已過期或無效，請重新申請重設密碼。");
+          }
+          setChecking(false);
+          return;
+        }
+
+        // 1b. URL query 中有 code（舊版 PKCE）
         const code = params.get("code");
         if (code) {
           console.log("[reset-password] found code");
@@ -124,7 +142,7 @@ export default function ResetPasswordPage() {
     if (password !== confirmPassword) { setError("兩次密碼輸入不一致"); return; }
 
     setLoading(true);
-    const supabase = getRawSupabase();
+    const supabase = createClient();
     const { error } = await supabase.auth.updateUser({ password });
 
     if (error) {
