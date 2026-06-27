@@ -3,12 +3,14 @@
 import { useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { suggestEmail } from "@/lib/email-typo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 export default function RegisterPage() {
   const [email, setEmail] = useState("");
+  const [emailSuggestion, setEmailSuggestion] = useState<string | null>(null);
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [nickname, setNickname] = useState("");
@@ -127,11 +129,31 @@ export default function RegisterPage() {
               id="email"
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                if (emailSuggestion) setEmailSuggestion(null);
+              }}
+              onBlur={(e) => setEmailSuggestion(suggestEmail(e.target.value))}
               placeholder="you@example.com"
               required
               className="mt-1 bg-card border-border"
             />
+            {emailSuggestion && (
+              <p className="mt-1.5 text-sm text-gold">
+                你是不是要打{" "}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmail(emailSuggestion);
+                    setEmailSuggestion(null);
+                  }}
+                  className="font-semibold underline underline-offset-2 hover:text-gold-light"
+                >
+                  {emailSuggestion}
+                </button>
+                ？
+              </p>
+            )}
           </div>
           <div>
             <Label htmlFor="password">密碼</Label>
