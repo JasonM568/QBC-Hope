@@ -64,10 +64,16 @@ export default function RegisterPage() {
       <div className="min-h-screen flex items-center justify-center px-4">
         <div className="text-center max-w-sm">
           <h1 className="text-3xl font-bold text-gold-gradient mb-4">
-            註冊成功！
+            註冊成功！請啟用帳號
           </h1>
+          <p className="text-muted-foreground mb-2">
+            我們已寄出一封確認信到
+          </p>
+          <p className="text-foreground font-medium mb-4 break-all">{email}</p>
           <p className="text-muted-foreground mb-6">
-            帳號已建立，現在可以登入了。
+            請到信箱點擊信中的連結啟用帳號，啟用後即可登入。
+            <br />
+            <span className="text-sm">沒收到？請檢查垃圾信件匣。</span>
           </p>
           <Link
             href="/auth/login"
