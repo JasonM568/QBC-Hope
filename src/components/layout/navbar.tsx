@@ -16,6 +16,7 @@ const allStudentItems = [
   { href: "/history", label: "成長曲線" },
   { href: "/community", label: "打卡牆" },
   { href: "/oracle", label: "能量牌卡" },
+  { href: "/guide", label: "使用說明" },
 ];
 
 const coachItems = [

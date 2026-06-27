@@ -30,6 +30,22 @@ export default function Home() {
             登入
           </Link>
         </div>
+        <div className="mt-10 w-full max-w-xl mx-auto rounded-xl border border-gold/30 bg-card p-6 text-center">
+          <p className="text-foreground text-lg font-semibold mb-2">這個網站在做什麼？</p>
+          <p className="text-muted-foreground leading-relaxed mb-5">
+            HOPE OS 是你的「人生升級系統」——每天寫
+            <span className="text-gold font-medium">感恩日記</span>
+            累積能量點數，再用點數抽
+            <span className="text-gold font-medium">量子牌卡</span>，
+            獲得專屬於你的引導與覺察。
+          </p>
+          <Link
+            href="/guide"
+            className="inline-block px-6 py-3 bg-gold text-black font-semibold rounded-lg hover:bg-gold-light transition-colors"
+          >
+            看完整功能介紹 →
+          </Link>
+        </div>
       </div>
 
       {/* Core Philosophy */}
