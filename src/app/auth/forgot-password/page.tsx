@@ -42,12 +42,12 @@ export default function ForgotPasswordPage() {
         {sent ? (
           <div className="text-center space-y-4">
             <div className="p-6 rounded-xl border border-green-400/30 bg-card">
-              <p className="text-green-400 font-medium mb-2">重設密碼信已寄出</p>
+              <p className="text-green-400 font-medium mb-2">已送出重設密碼要求</p>
               <p className="text-sm text-muted-foreground">
-                請到 <span className="text-foreground">{email}</span> 收信，點擊信中的連結來重設密碼。
+                如果 <span className="text-foreground">{email}</span> 已經註冊過，我們已將重設密碼連結寄到這個信箱，請收信並點擊連結。
               </p>
               <p className="text-xs text-muted-foreground mt-3">
-                沒收到？請檢查垃圾信件匣，或稍後再試。
+                沒收到？請先檢查垃圾信件匣；若仍沒有，可能是此信箱尚未註冊。
               </p>
             </div>
             <Link href="/auth/login" className="text-gold hover:underline text-sm">
