@@ -11,6 +11,15 @@
 
 每次新對話開始，**先讀 `HANDOFF.md` 最上方那筆紀錄**，了解上次做到哪、有什麼未完成項目，再開始今天的工作。
 
+## 開發驗證流程（重要）
+
+任何系統功能的調整，**一律先在 localhost 驗證、測試**，確認沒問題後，**才能** commit 並推上 Vercel。
+
+- 改完功能先跑 `npm run dev`，在 `http://localhost:3000` 實際操作驗證（必要時跑型別檢查 `npx tsc --noEmit`）。
+- **未經 localhost 驗證，不得 commit / push。**
+- 確認功能 OK 後，才 commit、push，讓 Vercel 部署。
+- 推上去前向使用者確認，不要自作主張直接 push 到正式環境。
+
 ## 收工流程（重要）
 
 當使用者說以下任一句子，**必須**把本次 session 的工作紀錄追加到 `HANDOFF.md` 最上方：
