@@ -30,8 +30,9 @@ function LoginForm() {
 
     const supabase = createClient();
     const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
+      // 正規化：去頭尾空白、email 轉小寫，避免手機鍵盤自動大寫/補空白導致帳密錯誤
+      email: email.trim().toLowerCase(),
+      password: password.trim(),
     });
 
     if (error) {
@@ -80,6 +81,11 @@ function LoginForm() {
           <Input
             id="email"
             type="email"
+            inputMode="email"
+            autoCapitalize="none"
+            autoCorrect="off"
+            autoComplete="email"
+            spellCheck={false}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="you@example.com"
@@ -92,6 +98,10 @@ function LoginForm() {
           <Input
             id="password"
             type="password"
+            autoCapitalize="none"
+            autoCorrect="off"
+            autoComplete="current-password"
+            spellCheck={false}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="••••••••"
