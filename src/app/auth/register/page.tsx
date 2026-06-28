@@ -22,10 +22,12 @@ export default function RegisterPage() {
     e.preventDefault();
     setError("");
 
-    // 驗證姓名：至少 2 個中文字
-    const chineseOnly = /^[\u4e00-\u9fff]{2,}$/;
-    if (!chineseOnly.test(name.trim())) {
-      setError("姓名請輸入至少 2 個中文字（僅限繁體中文）");
+    // 驗證姓名：至少含 2 個中文字；允許空格、間隔號與罕用字（含擴充 A 區、相容字）
+    const trimmed = name.trim();
+    const chineseCount = (trimmed.match(/[\u3400-\u9fff\uf900-\ufaff]/g) || []).length;
+    const onlyAllowedChars = /^[\u3400-\u9fff\uf900-\ufaff\u00b7\u30fb\s]+$/.test(trimmed);
+    if (chineseCount < 2 || !onlyAllowedChars) {
+      setError("姓名請輸入至少 2 個中文字");
       return;
     }
 
