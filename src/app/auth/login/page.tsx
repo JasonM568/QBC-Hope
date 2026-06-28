@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,6 @@ function LoginForm() {
   const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
   const searchParams = useSearchParams();
   const reason = searchParams.get("reason");
   const linkErrorRaw = searchParams.get("error");
@@ -57,8 +56,9 @@ function LoginForm() {
       }
     }
 
-    router.push("/dashboard");
-    router.refresh();
+    // 用整頁導向（而非 router.push）確保帶著剛寫入的 session cookie 重走 middleware，
+    // 避免登入成功卻卡在「登入中...」不跳轉。
+    window.location.href = "/dashboard";
   }
 
   return (
