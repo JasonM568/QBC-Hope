@@ -87,6 +87,13 @@ const emptyReport: DailyReport = {
   announced_in_group: false,
 };
 
+// 將 YYYY-MM-DD 加減天數（用 UTC 運算避免時區位移）
+function addDaysISO(dateStr: string, n: number): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d) + n * 86400000);
+  return dt.toISOString().split("T")[0];
+}
+
 function Checkbox({ checked, onChange, label, disabled }: {
   checked: boolean; onChange: (v: boolean) => void; label: string; disabled?: boolean;
 }) {
@@ -119,6 +126,8 @@ export default function DailyReportPage() {
   const [report, setReport] = useState<DailyReport>(emptyReport);
   const [existing, setExisting] = useState(false);
   const [editing, setEditing] = useState(false);
+  // 修改模式下，想把這篇日記挪到哪一天（僅限昨天／今天／明天）
+  const [editTargetDate, setEditTargetDate] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [userName, setUserName] = useState("");
@@ -138,6 +147,11 @@ export default function DailyReportPage() {
     setReport((prev) => ({ ...prev, [key]: value }));
 
   const activeDate = selectedDate || today;
+
+  // 日期調整僅允許前後 1 天（昨天／今天／明天），避免補填任意日期灌「連續打卡」點數
+  const yesterday = today ? addDaysISO(today, -1) : "";
+  const tomorrow = today ? addDaysISO(today, 1) : "";
+  const canCreateForActive = !!today && activeDate >= yesterday && activeDate <= tomorrow;
 
   // 計算指定日期是第幾天（每輪從 plan_start_date 起算 Day 1）
   function calcDayNumber(startDate: string, _round: number, forDate?: string): number {
@@ -371,18 +385,46 @@ export default function DailyReportPage() {
     };
 
     if (existing && editing) {
-      // 修改模式：更新日報
+      // 修改模式：更新日報（可一併把日期挪到昨天／今天／明天）
+      const target = editTargetDate || activeDate;
+
+      // 若要改日期：檢查 ±1 範圍 + 目標日期未被其他日記占用
+      if (target !== activeDate) {
+        if (target < yesterday || target > tomorrow) {
+          setMessage("日期僅能調整為昨天、今天或明天。");
+          setSaving(false);
+          return;
+        }
+        const { data: clash } = await supabase
+          .from("daily_reports")
+          .select("id")
+          .eq("user_id", user.id)
+          .eq("report_date", target)
+          .maybeSingle();
+        if (clash && clash.id !== report.id) {
+          setMessage(`${target} 已經有一篇日記了，無法移到該日期。`);
+          setSaving(false);
+          return;
+        }
+      }
+
       const { error } = await supabase
         .from("daily_reports")
-        .update(safeData)
-        .eq("user_id", user.id)
-        .eq("report_date", activeDate);
+        .update({ ...safeData, report_date: target })
+        .eq("id", report.id);
 
       if (error) {
-        setMessage("修改失敗：" + error.message);
+        if (error.code === "23505") {
+          setMessage(`${target} 已經有一篇日記了，無法移到該日期。`);
+        } else {
+          setMessage("修改失敗：" + error.message);
+        }
+        setSaving(false);
+        return;
       } else {
-        setMessage("日報已修改！");
+        setMessage(target !== activeDate ? `日報已更新，日期改為 ${target}` : "日報已修改！");
         setEditing(false);
+        if (target !== activeDate) setSelectedDate(target);
       }
     } else {
       // 新增模式
@@ -528,7 +570,11 @@ export default function DailyReportPage() {
 
               {activeDate !== today && (
                 <p className="text-xs text-yellow-400">
-                  {existing ? `正在查看 ${activeDate} 的日報` : `正在補填 ${activeDate} 的日報`}
+                  {existing
+                    ? `正在查看 ${activeDate} 的日報`
+                    : canCreateForActive
+                      ? `正在補填 ${activeDate} 的日報`
+                      : `${activeDate} 超過可補填範圍（僅限昨天／今天／明天）`}
                 </p>
               )}
 
@@ -612,7 +658,55 @@ export default function DailyReportPage() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>日期</Label>
-                <Input value={activeDate} disabled className={`mt-1 bg-background border-border ${activeDate !== today ? "text-yellow-400" : ""}`} />
+                {existing && editing ? (
+                  canCreateForActive ? (
+                    <>
+                      <div className="mt-1 flex gap-1.5">
+                        {[{ n: -1, l: "昨天" }, { n: 0, l: "今天" }, { n: 1, l: "明天" }].map(({ n, l }) => {
+                          const d = today ? addDaysISO(today, n) : "";
+                          const sel = (editTargetDate || activeDate) === d;
+                          return (
+                            <button
+                              key={n}
+                              type="button"
+                              onClick={() => setEditTargetDate(d)}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${sel ? "bg-gold text-black" : "bg-background border border-border text-muted-foreground hover:text-foreground"}`}
+                            >
+                              {l}（{d.slice(5)}）
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {editTargetDate && editTargetDate !== activeDate && (
+                        <p className="mt-1.5 text-xs text-yellow-400">將把此日記日期由 {activeDate} 改為 {editTargetDate}</p>
+                      )}
+                    </>
+                  ) : (
+                    <p className="mt-1 text-sm text-yellow-400">{activeDate}（此日期較早，僅能修改內容，無法改日期）</p>
+                  )
+                ) : (
+                  <>
+                    <div className="mt-1 flex gap-1.5">
+                      {[{ n: -1, l: "昨天" }, { n: 0, l: "今天" }, { n: 1, l: "明天" }].map(({ n, l }) => {
+                        const d = today ? addDaysISO(today, n) : "";
+                        const isActive = activeDate === d;
+                        return (
+                          <button
+                            key={n}
+                            type="button"
+                            onClick={() => switchDate(d)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${isActive ? "bg-gold text-black" : "bg-background border border-border text-muted-foreground hover:text-foreground"}`}
+                          >
+                            {l}（{d.slice(5)}）
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className={`mt-1.5 text-xs ${activeDate !== today ? "text-yellow-400" : "text-muted-foreground"}`}>
+                      目前：{activeDate}{activeDate === today ? "（今天）" : ""}
+                    </p>
+                  </>
+                )}
               </div>
               <div>
                 <Label>第幾天 (1-21)</Label>
@@ -860,7 +954,7 @@ export default function DailyReportPage() {
             </p>
           )}
 
-          {(!existing || editing) && (
+          {((!existing && canCreateForActive) || editing) && (
             <Button
               type="submit"
               disabled={saving}
@@ -870,10 +964,16 @@ export default function DailyReportPage() {
             </Button>
           )}
 
+          {!existing && !canCreateForActive && (
+            <p className="text-sm text-yellow-400 text-center">
+              此日期超過可填寫範圍，僅能填寫昨天、今天或明天的日記。
+            </p>
+          )}
+
           {existing && !editing && (
             <Button
               type="button"
-              onClick={() => { setEditing(true); setMessage(""); }}
+              onClick={() => { setEditing(true); setEditTargetDate(activeDate); setMessage(""); }}
               className="w-full bg-secondary text-foreground hover:bg-secondary/80 font-semibold h-12 mt-3"
             >
               修改今日日報
@@ -883,7 +983,7 @@ export default function DailyReportPage() {
           {editing && (
             <Button
               type="button"
-              onClick={() => { setEditing(false); setMessage(""); }}
+              onClick={() => { setEditing(false); setEditTargetDate(""); setMessage(""); }}
               variant="outline"
               className="w-full mt-3"
             >
