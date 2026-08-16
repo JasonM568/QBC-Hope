@@ -273,8 +273,9 @@ export default function DailyReportPage() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { setMessage("登入狀態已過期，請重新登入"); setStartingSaving(false); return; }
 
-    // 防呆：如果起始日晚於今天，且已有先前的日報，提醒會被排除
-    if (planInputDate > today) {
+    // 防呆：起始日晚於今天一律再確認一次（最常見的誤操作是日期選擇器不小心滑到下個月）。
+    // 若已有先前的日報，額外提醒那些日報會被排除在本輪之外。
+    if (today && planInputDate > today) {
       const { data: existingReports } = await supabase
         .from("daily_reports")
         .select("report_date")
@@ -282,17 +283,19 @@ export default function DailyReportPage() {
         .lt("report_date", planInputDate)
         .order("report_date", { ascending: false });
 
-      if (existingReports && existingReports.length > 0) {
-        const dates = existingReports.map(r => r.report_date).join("、");
-        const confirmed = window.confirm(
-          `注意：你選擇的起始日是 ${planInputDate}（未來日期）。\n\n` +
-          `你之前已填寫的日報（${dates}）將不會計入本輪第 1-21 天的進度。\n\n` +
-          `確定要以 ${planInputDate} 作為起始日嗎？`
-        );
-        if (!confirmed) {
-          setStartingSaving(false);
-          return;
-        }
+      const extraWarning =
+        existingReports && existingReports.length > 0
+          ? `你之前已填寫的日報（${existingReports.map(r => r.report_date).join("、")}）將不會計入本輪第 1-21 天的進度。\n\n`
+          : `在那天之前，你的計畫都還不會開始（Day 1 從 ${planInputDate} 起算）。\n\n`;
+
+      const confirmed = window.confirm(
+        `注意：你選擇的起始日是 ${planInputDate}，是未來日期（今天是 ${today}）。\n\n` +
+        extraWarning +
+        `確定要以 ${planInputDate} 作為起始日嗎？`
+      );
+      if (!confirmed) {
+        setStartingSaving(false);
+        return;
       }
     }
 
@@ -604,18 +607,26 @@ export default function DailyReportPage() {
             </p>
             <div>
               <Label className="mb-1 block">計畫起始日</Label>
-              <p className="text-xs text-muted-foreground mb-2">請點選下方欄位選擇日期</p>
+              <p className="text-xs text-muted-foreground mb-2">請點選下方欄位選擇日期（最晚為今天）</p>
               <Input
                 type="date"
                 value={planInputDate}
+                max={today || undefined}
                 onChange={(e) => setPlanInputDate(e.target.value)}
                 className="mt-1 border-gold/30 text-foreground bg-background [color-scheme:dark]"
               />
             </div>
             {planInputDate && (
-              <p className="text-sm text-gold">
-                已選擇：{planInputDate}
-              </p>
+              today && planInputDate > today ? (
+                <p className="text-sm text-red-400">
+                  已選擇：{planInputDate}（未來日期，今天是 {today}）<br />
+                  計畫要到那天才開始，確定不是選錯月份嗎？
+                </p>
+              ) : (
+                <p className="text-sm text-gold">
+                  已選擇：{planInputDate}
+                </p>
+              )
             )}
             <Button
               type="button"
