@@ -3,6 +3,11 @@ import { createClient } from "@/lib/supabase/server";
 import Navbar from "@/components/layout/navbar";
 import V2PointsBanner from "@/components/v2-points-banner";
 import Link from "next/link";
+import {
+  computeCompletion,
+  findRecoverableMiss,
+  rateTone,
+} from "@/lib/plan/completion";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -69,6 +74,24 @@ export default async function DashboardPage() {
     }
   }
 
+  // 本輪達成率（分子分母都只算到昨天；今天還沒過完不列入分母）
+  const roundDates = (recentReports ?? []).map((r) => r.report_date);
+  const completion = planStartDate
+    ? computeCompletion(planStartDate, today, roundDates)
+    : null;
+
+  // 漏填提醒：昨天空著，而且只剩今天能補
+  const missedYesterday = findRecoverableMiss(planStartDate, today, roundDates);
+
+  // 歷屆輪程（達成率在封存時已定格）
+  const { data: archivedRounds } = await supabase
+    .from("plan_rounds")
+    .select("round_number, start_date, end_date, completed_days, completion_rate")
+    .eq("user_id", user.id)
+    .eq("status", "archived")
+    .order("round_number", { ascending: false })
+    .limit(12);
+
   // Get recent coach feedback
   const { data: coachFeedback } = await supabase
     .from("coach_notes")
@@ -103,13 +126,53 @@ export default async function DashboardPage() {
           </p>
         </div>
 
+        {/* 漏填提醒：昨天沒填，只剩今天能補 */}
+        {missedYesterday && (
+          <div className="mb-8 p-4 rounded-xl border border-yellow-400/40 bg-yellow-400/5">
+            <p className="text-sm font-semibold text-yellow-400">
+              昨天（{missedYesterday}）的日報還沒填
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              補填期限只到今天結束。過了今天，這一天就補不回來，會計入本輪達成率的缺漏。
+            </p>
+            <Link
+              href="/forms/daily"
+              className="inline-block mt-3 px-4 py-2 rounded-lg bg-yellow-400 text-black text-sm font-semibold hover:bg-yellow-300 transition-colors"
+            >
+              立即補填
+            </Link>
+          </div>
+        )}
+
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <div className="p-6 rounded-xl border border-border bg-card">
             <p className="text-muted-foreground text-sm">
               {planStartDate ? `第 ${planRound} 輪累計` : "累計天數"}
             </p>
             <p className="text-3xl font-bold text-gold mt-1">{totalReports || 0}<span className="text-base font-normal text-muted-foreground"> / 21 天</span></p>
+          </div>
+          <div className="p-6 rounded-xl border border-border bg-card">
+            <p className="text-muted-foreground text-sm">本輪達成率</p>
+            {completion && completion.rate !== null ? (
+              <>
+                <p className={`text-3xl font-bold mt-1 ${rateTone(completion.rate)}`}>
+                  {completion.rate}<span className="text-base font-normal">%</span>
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {completion.completed}/{completion.expected} 天
+                  {completion.missed > 0 && `・缺 ${completion.missed} 天`}
+                  {!completion.isFinished && "・統計至昨日"}
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-3xl font-bold text-muted-foreground mt-1">—</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {planStartDate ? "今天是 Day 1，明天開始統計" : "尚未啟動計畫"}
+                </p>
+              </>
+            )}
           </div>
           <div className="p-6 rounded-xl border border-border bg-card">
             <p className="text-muted-foreground text-sm">連續打卡</p>
@@ -169,8 +232,35 @@ export default async function DashboardPage() {
           </Link>
         </div>
 
+        {/* 歷屆 21 天 */}
+        {archivedRounds && archivedRounds.length > 0 && (
+          <div className="mt-6">
+            <h2 className="text-lg font-semibold mb-4">歷屆 21 天</h2>
+            <div className="rounded-xl border border-border bg-card divide-y divide-border">
+              {archivedRounds.map((r) => (
+                <div key={r.round_number} className="flex items-center justify-between gap-3 p-4">
+                  <div>
+                    <p className="text-sm font-medium">第 {r.round_number} 輪</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {r.start_date} ~ {r.end_date}
+                    </p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className={`text-xl font-bold ${rateTone(Number(r.completion_rate))}`}>
+                      {Number(r.completion_rate)}<span className="text-sm font-normal">%</span>
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {r.completed_days}/21 天
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Five Engines */}
-        <h2 className="text-lg font-semibold mt-2 mb-4">五大引擎</h2>
+        <h2 className="text-lg font-semibold mt-6 mb-4">五大引擎</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <Link href="/forms/daily" className="p-5 rounded-xl border border-border bg-card card-hover group">
             <h3 className="font-semibold text-foreground group-hover:text-gold transition-colors">21天行動日報表</h3>

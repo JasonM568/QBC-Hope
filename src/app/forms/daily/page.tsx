@@ -10,6 +10,12 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { exportDailyPDF } from "@/lib/export-pdf";
 import ReportPreview from "@/components/report-preview";
+import {
+  addDaysISO,
+  computeCompletion,
+  findRecoverableMiss,
+  rateTone,
+} from "@/lib/plan/completion";
 
 interface DailyReport {
   id?: string;
@@ -87,11 +93,25 @@ const emptyReport: DailyReport = {
   announced_in_group: false,
 };
 
-// 將 YYYY-MM-DD 加減天數（用 UTC 運算避免時區位移）
-function addDaysISO(dateStr: string, n: number): string {
-  const [y, m, d] = dateStr.split("-").map(Number);
-  const dt = new Date(Date.UTC(y, m - 1, d) + n * 86400000);
-  return dt.toISOString().split("T")[0];
+interface PlanRoundRow {
+  start_date: string;
+  round_number: number;
+}
+
+/**
+ * 輪程 RPC 的回傳正規化。
+ *
+ * 三個函式都宣告 `RETURNS plan_rounds`（composite type），PostgREST 對這種
+ * 回傳可能給單一物件，也可能給單元素陣列。兩種都接，避免綁死在某一種行為上。
+ */
+function pickRound(data: unknown): PlanRoundRow | null {
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row || typeof row !== "object") return null;
+  const r = row as Partial<PlanRoundRow>;
+  if (typeof r.start_date !== "string" || typeof r.round_number !== "number") {
+    return null;
+  }
+  return { start_date: r.start_date, round_number: r.round_number };
 }
 
 function Checkbox({ checked, onChange, label, disabled }: {
@@ -140,6 +160,8 @@ export default function DailyReportPage() {
   const [today, setToday] = useState("");
   const [selectedDate, setSelectedDate] = useState("");
   const [showHistory, setShowHistory] = useState(false);
+  // 目前表單內容的「乾淨基準」，用來判斷有沒有未儲存的輸入
+  const [baseline, setBaseline] = useState(() => JSON.stringify(emptyReport));
   const [pastReports, setPastReports] = useState<{ report_date: string; day_number: number; energy_state: number; daily_score: number }[]>([]);
   const router = useRouter();
 
@@ -152,6 +174,21 @@ export default function DailyReportPage() {
   const yesterday = today ? addDaysISO(today, -1) : "";
   const tomorrow = today ? addDaysISO(today, 1) : "";
   const canCreateForActive = !!today && activeDate >= yesterday && activeDate <= tomorrow;
+
+  // 表單唯讀判斷。兩種情況：
+  //  1. 已存在的日報 → 非編輯模式時唯讀
+  //  2. 不存在的日報 → 超出補填窗口時唯讀
+  //     （若不鎖住，使用者會打完一整篇才發現沒有送出鍵，內容直接蒸發）
+  const isReadOnly = existing ? !editing : !canCreateForActive;
+
+  // 有未儲存的輸入時，切換日期／離開頁面要先攔一下
+  const isDirty = JSON.stringify(report) !== baseline;
+
+  // 漏填提醒：昨天空著、且還落在本輪窗口內。
+  // 補填窗口是 ±1 天，所以「昨天」是唯一還救得回來的缺漏，過了今天就永久補不了。
+  const missedYesterday = today
+    ? findRecoverableMiss(planStartDate, today, pastReports.map((r) => r.report_date))
+    : null;
 
   // 計算指定日期是第幾天（每輪從 plan_start_date 起算 Day 1）
   function calcDayNumber(startDate: string, _round: number, forDate?: string): number {
@@ -166,21 +203,37 @@ export default function DailyReportPage() {
 
   // 切換日期時重新載入資料
   async function switchDate(newDate: string) {
+    if (newDate === activeDate) return;
+
+    // 防呆：切換日期會整份重載，未儲存的輸入會直接消失。
+    // 以前是無聲清空，使用者打到一半點去補昨天就全沒了。
+    if (isDirty) {
+      const ok = window.confirm(
+        `「${activeDate}」還有尚未儲存的內容。\n\n` +
+        `切換到「${newDate}」會清空這些輸入，且無法復原。\n\n` +
+        `確定要切換嗎？`
+      );
+      if (!ok) return;
+    }
+
     setSelectedDate(newDate);
     setLoading(true);
     setExisting(false);
     setEditing(false);
+    setEditTargetDate("");
     setMessage("");
-    setReport(emptyReport);
 
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { setLoading(false); return; }
 
-    if (planStartDate) {
-      const dayNum = calcDayNumber(planStartDate, planRound, newDate);
-      setReport((prev) => ({ ...prev, day_number: dayNum > 0 ? dayNum : 1 }));
-    }
+    const dayNum = planStartDate
+      ? calcDayNumber(planStartDate, planRound, newDate)
+      : emptyReport.day_number;
+    let next: DailyReport = {
+      ...emptyReport,
+      day_number: dayNum > 0 ? dayNum : 1,
+    };
 
     const { data } = await supabase
       .from("daily_reports")
@@ -193,13 +246,16 @@ export default function DailyReportPage() {
       const correctDayNum = planStartDate
         ? calcDayNumber(planStartDate, planRound, newDate)
         : data.day_number;
-      setReport({
+      next = {
         ...emptyReport,
         ...data,
         day_number: correctDayNum > 0 ? correctDayNum : data.day_number,
-      });
+      };
       setExisting(true);
     }
+
+    setReport(next);
+    setBaseline(JSON.stringify(next));
     setLoading(false);
   }
 
@@ -223,12 +279,14 @@ export default function DailyReportPage() {
 
       setRoundResetUsed(profile?.round_reset_used || false);
 
+      let next: DailyReport = emptyReport;
+
       if (profile?.plan_start_date) {
         setPlanStartDate(profile.plan_start_date);
         const round = profile.plan_round || 1;
         setPlanRound(round);
         const dayNum = calcDayNumber(profile.plan_start_date, round, clientToday);
-        setReport((prev) => ({ ...prev, day_number: dayNum > 0 ? dayNum : 1 }));
+        next = { ...next, day_number: dayNum > 0 ? dayNum : 1 };
       }
 
       const { data } = await supabase
@@ -242,13 +300,16 @@ export default function DailyReportPage() {
         const correctDayNum = profile?.plan_start_date
           ? calcDayNumber(profile.plan_start_date, profile?.plan_round || 1, clientToday)
           : data.day_number;
-        setReport({
+        next = {
           ...emptyReport,
           ...data,
           day_number: correctDayNum > 0 ? correctDayNum : data.day_number,
-        });
+        };
         setExisting(true);
       }
+
+      setReport(next);
+      setBaseline(JSON.stringify(next));
 
       // 載入所有歷史日報
       const { data: history } = await supabase
@@ -299,17 +360,17 @@ export default function DailyReportPage() {
       }
     }
 
-    const { error } = await supabase
-      .from("profiles")
-      .update({ plan_start_date: planInputDate, plan_round: 1 })
-      .eq("id", user.id);
+    // 走 RPC：同時建立 plan_rounds 的 active 輪次並同步 profiles，避免兩邊不一致
+    const { data, error } = await supabase
+      .rpc("start_plan_round", { p_start_date: planInputDate });
+    const round = pickRound(data);
 
-    if (error) {
-      setMessage("啟動失敗：" + error.message);
+    if (error || !round) {
+      setMessage("啟動失敗：" + (error?.message ?? "沒有取得輪程資料"));
     } else {
-      setPlanStartDate(planInputDate);
-      setPlanRound(1);
-      const dayNum = calcDayNumber(planInputDate, 1);
+      setPlanStartDate(round.start_date);
+      setPlanRound(round.round_number);
+      const dayNum = calcDayNumber(round.start_date, round.round_number);
       setReport((prev) => ({ ...prev, day_number: dayNum > 0 ? dayNum : 1 }));
       setMessage("21天計畫已啟動！");
     }
@@ -322,20 +383,17 @@ export default function DailyReportPage() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { setMessage("登入狀態已過期，請重新登入"); setStartingSaving(false); return; }
 
-    const newRound = planRound + 1;
-    const newStartDate = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" });
-    const { error } = await supabase
-      .from("profiles")
-      .update({ plan_round: newRound, plan_start_date: newStartDate })
-      .eq("id", user.id);
+    // RPC 會先把本輪封存（定格達成率）再開下一輪
+    const { data, error } = await supabase.rpc("begin_next_round");
+    const round = pickRound(data);
 
-    if (error) {
-      setMessage("重新啟動失敗：" + error.message);
+    if (error || !round) {
+      setMessage("重新啟動失敗：" + (error?.message ?? "沒有取得輪程資料"));
     } else {
-      setPlanStartDate(newStartDate);
-      setPlanRound(newRound);
+      setPlanStartDate(round.start_date);
+      setPlanRound(round.round_number);
       setReport((prev) => ({ ...prev, day_number: 1 }));
-      setMessage(`第 ${newRound} 輪 21 天計畫已開始！`);
+      setMessage(`第 ${round.round_number} 輪 21 天計畫已開始！`);
     }
     setStartingSaving(false);
   }
@@ -349,16 +407,13 @@ export default function DailyReportPage() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { setMessage("登入狀態已過期，請重新登入"); setStartingSaving(false); return; }
 
-    const newStartDate = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" });
-    const { error } = await supabase
-      .from("profiles")
-      .update({ plan_start_date: newStartDate, round_reset_used: true })
-      .eq("id", user.id);
+    const { data, error } = await supabase.rpc("reset_active_round");
+    const round = pickRound(data);
 
-    if (error) {
-      setMessage("重新啟動失敗：" + error.message);
+    if (error || !round) {
+      setMessage("重新啟動失敗：" + (error?.message ?? "沒有取得輪程資料"));
     } else {
-      setPlanStartDate(newStartDate);
+      setPlanStartDate(round.start_date);
       setRoundResetUsed(true);
       setReport((prev) => ({ ...prev, day_number: 1 }));
       setMessage(`第 ${planRound} 輪已重新啟動！`);
@@ -427,6 +482,7 @@ export default function DailyReportPage() {
       } else {
         setMessage(target !== activeDate ? `日報已更新，日期改為 ${target}` : "日報已修改！");
         setEditing(false);
+        setBaseline(JSON.stringify(report));
         if (target !== activeDate) setSelectedDate(target);
       }
     } else {
@@ -446,6 +502,7 @@ export default function DailyReportPage() {
       } else {
         setMessage("日報已儲存！");
         setExisting(true);
+        setBaseline(JSON.stringify(report));
       }
     }
 
@@ -481,6 +538,25 @@ export default function DailyReportPage() {
           <p className="text-muted-foreground mt-1">21-Day Action System Daily Report</p>
         </div>
 
+        {/* 漏填提醒：昨天沒填，而且只剩今天能補 */}
+        {missedYesterday && activeDate !== missedYesterday && (
+          <div className="mb-6 p-4 rounded-xl border border-yellow-400/40 bg-yellow-400/5">
+            <p className="text-sm font-semibold text-yellow-400">
+              昨天（{missedYesterday}）的日報還沒填
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              補填期限只到今天結束。過了今天，這一天就補不回來，會計入本輪達成率的缺漏。
+            </p>
+            <Button
+              type="button"
+              onClick={() => switchDate(missedYesterday)}
+              className="mt-3 h-9 bg-yellow-400 text-black hover:bg-yellow-300 font-semibold text-sm"
+            >
+              立即補填 {missedYesterday}
+            </Button>
+          </div>
+        )}
+
         {/* 常駐日期切換列 */}
         {planStartDate && (() => {
           // 計算 21 天計畫範圍
@@ -500,6 +576,9 @@ export default function DailyReportPage() {
           const filledDates = new Set(pastReports.map(r => r.report_date));
           const filledCount = allDays.filter(ds => filledDates.has(ds)).length;
 
+          // 本輪達成率（分子分母都只算到昨天，今天還沒過完不列入分母）
+          const completion = computeCompletion(planStartDate, today, filledDates);
+
           // 預設顯示近 7 天（限制在計畫範圍內）
           const recentDays: string[] = [];
           for (let i = 0; i < 7; i++) {
@@ -513,11 +592,25 @@ export default function DailyReportPage() {
 
           return (
             <div className="mb-6 p-4 rounded-xl border border-border bg-card space-y-3">
-              <div className="flex items-center justify-between">
+              <div className="flex items-start justify-between gap-3">
                 <p className="text-sm font-medium text-gold">近 7 天日報</p>
-                <p className="text-xs text-muted-foreground">
-                  21 天已完成 {filledCount}/21 天
-                </p>
+                <div className="text-right shrink-0">
+                  <p className="text-xs text-muted-foreground">
+                    21 天已完成 {filledCount}/21 天
+                  </p>
+                  {completion.rate !== null && (
+                    <p className="text-xs mt-0.5">
+                      <span className="text-muted-foreground">達成率 </span>
+                      <span className={`font-semibold ${rateTone(completion.rate)}`}>
+                        {completion.rate}%
+                      </span>
+                      <span className="text-muted-foreground">
+                        {" "}（{completion.completed}/{completion.expected}
+                        {completion.isFinished ? " 天" : " 天・至昨日"}）
+                      </span>
+                    </p>
+                  )}
+                </div>
               </div>
               <div className="flex gap-2 flex-wrap">
                 {recentDays.map((ds) => {
@@ -530,7 +623,7 @@ export default function DailyReportPage() {
                     <button
                       key={ds}
                       type="button"
-                      onClick={() => { if (isToday) { setSelectedDate(""); } else { switchDate(ds); } }}
+                      onClick={() => switchDate(ds)}
                       className={`relative px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
                         isActive
                           ? "bg-gold text-black"
@@ -552,10 +645,7 @@ export default function DailyReportPage() {
                 <p className="text-xs text-muted-foreground shrink-0">指定日期</p>
                 <select
                   value={activeDate}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    if (v === today) { setSelectedDate(""); } else { switchDate(v); }
-                  }}
+                  onChange={(e) => switchDate(e.target.value)}
                   className="flex-1 text-xs bg-background border border-border rounded-lg px-2 py-1.5 text-foreground [color-scheme:dark]"
                 >
                   {allDays.map((ds) => {
@@ -664,6 +754,27 @@ export default function DailyReportPage() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* 超出補填窗口：在最上面就講清楚，並且整份表單唯讀。
+              以前欄位是可以打字的，使用者會寫完一整篇才發現沒有送出鍵。 */}
+          {!existing && !canCreateForActive && (
+            <div className="p-4 rounded-xl border border-red-400/40 bg-red-400/5">
+              <p className="text-sm font-semibold text-red-400">
+                {activeDate} 已超過補填期限，這一天無法再填寫
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                日報只能填寫「昨天、今天、明天」三天，避免事後補填影響連續打卡的真實性。
+                下方表單已鎖定為唯讀，請切換到可填寫的日期。
+              </p>
+              <Button
+                type="button"
+                onClick={() => switchDate(today)}
+                className="mt-3 h-9 bg-gold text-black hover:bg-gold-light font-semibold text-sm"
+              >
+                回到今天（{today}）
+              </Button>
+            </div>
+          )}
+
           {/* Header Info */}
           <div className="p-6 rounded-xl border border-border bg-card space-y-4">
             <div className="grid grid-cols-2 gap-4">
@@ -735,7 +846,7 @@ export default function DailyReportPage() {
                     type="number" min={1} max={21}
                     value={report.day_number}
                     onChange={(e) => set("day_number", parseInt(e.target.value) || 1)}
-                    disabled={existing && !editing}
+                    disabled={isReadOnly}
                     className="mt-1 bg-background border-border"
                   />
                 )}
@@ -747,7 +858,7 @@ export default function DailyReportPage() {
                 type="range" min={1} max={10}
                 value={report.energy_state}
                 onChange={(e) => set("energy_state", parseInt(e.target.value))}
-                disabled={existing && !editing}
+                disabled={isReadOnly}
                 className="w-full mt-2 accent-gold"
               />
               <div className="flex justify-between text-xs text-muted-foreground mt-1">
@@ -759,7 +870,7 @@ export default function DailyReportPage() {
               <Textarea
                 value={report.most_important_thing}
                 onChange={(e) => set("most_important_thing", e.target.value)}
-                disabled={existing && !editing}
+                disabled={isReadOnly}
                 placeholder="今天最重要的一件事..."
                 rows={2}
                 className="mt-1 bg-background border-border"
@@ -772,17 +883,17 @@ export default function DailyReportPage() {
             <PartHeader num={1} title="晨間信念打卡" />
             <p className="text-sm text-muted-foreground mb-3">每天早晨朗讀</p>
             <div className="space-y-2 mb-4">
-              <Checkbox checked={report.belief_four_beliefs} onChange={(v) => set("belief_four_beliefs", v)} label="四大信念" disabled={existing && !editing} />
-              <Checkbox checked={report.belief_find_hope} onChange={(v) => set("belief_find_hope", v)} label="找到方法，看見希望" disabled={existing && !editing} />
-              <Checkbox checked={report.belief_cognition} onChange={(v) => set("belief_cognition", v)} label="人生不是被環境決定，而是被認知決定" disabled={existing && !editing} />
-              <Checkbox checked={report.belief_upgrade} onChange={(v) => set("belief_upgrade", v)} label="我每天都在升級自己" disabled={existing && !editing} />
-              <Checkbox checked={report.belief_shine} onChange={(v) => set("belief_shine", v)} label="我願意照亮他人" disabled={existing && !editing} />
+              <Checkbox checked={report.belief_four_beliefs} onChange={(v) => set("belief_four_beliefs", v)} label="四大信念" disabled={isReadOnly} />
+              <Checkbox checked={report.belief_find_hope} onChange={(v) => set("belief_find_hope", v)} label="找到方法，看見希望" disabled={isReadOnly} />
+              <Checkbox checked={report.belief_cognition} onChange={(v) => set("belief_cognition", v)} label="人生不是被環境決定，而是被認知決定" disabled={isReadOnly} />
+              <Checkbox checked={report.belief_upgrade} onChange={(v) => set("belief_upgrade", v)} label="我每天都在升級自己" disabled={isReadOnly} />
+              <Checkbox checked={report.belief_shine} onChange={(v) => set("belief_shine", v)} label="我願意照亮他人" disabled={isReadOnly} />
             </div>
             <Label>今日一句自我宣言</Label>
             <Textarea
               value={report.self_declaration}
               onChange={(e) => set("self_declaration", e.target.value)}
-              disabled={existing && !editing}
+              disabled={isReadOnly}
               placeholder="今日一句自我宣言..."
               rows={2}
               className="mt-1 bg-background border-border"
@@ -798,7 +909,7 @@ export default function DailyReportPage() {
                 <Textarea
                   value={report.awareness_improve}
                   onChange={(e) => set("awareness_improve", e.target.value)}
-                  disabled={existing && !editing}
+                  disabled={isReadOnly}
                   rows={3}
                   className="mt-1 bg-background border-border"
                 />
@@ -808,7 +919,7 @@ export default function DailyReportPage() {
                 <Textarea
                   value={report.awareness_notice}
                   onChange={(e) => set("awareness_notice", e.target.value)}
-                  disabled={existing && !editing}
+                  disabled={isReadOnly}
                   rows={3}
                   className="mt-1 bg-background border-border"
                 />
@@ -823,17 +934,17 @@ export default function DailyReportPage() {
             <Textarea
               value={report.learning_content}
               onChange={(e) => set("learning_content", e.target.value)}
-              disabled={existing && !editing}
+              disabled={isReadOnly}
               rows={3}
               className="mt-1 bg-background border-border"
             />
             <p className="text-sm text-muted-foreground mt-3 mb-2">學習來源</p>
             <div className="flex flex-wrap gap-4">
-              <Checkbox checked={report.learning_course} onChange={(v) => set("learning_course", v)} label="課程" disabled={existing && !editing} />
-              <Checkbox checked={report.learning_book} onChange={(v) => set("learning_book", v)} label="書籍" disabled={existing && !editing} />
-              <Checkbox checked={report.learning_dialogue} onChange={(v) => set("learning_dialogue", v)} label="對話" disabled={existing && !editing} />
-              <Checkbox checked={report.learning_observation} onChange={(v) => set("learning_observation", v)} label="觀察" disabled={existing && !editing} />
-              <Checkbox checked={report.learning_other} onChange={(v) => set("learning_other", v)} label="其他" disabled={existing && !editing} />
+              <Checkbox checked={report.learning_course} onChange={(v) => set("learning_course", v)} label="課程" disabled={isReadOnly} />
+              <Checkbox checked={report.learning_book} onChange={(v) => set("learning_book", v)} label="書籍" disabled={isReadOnly} />
+              <Checkbox checked={report.learning_dialogue} onChange={(v) => set("learning_dialogue", v)} label="對話" disabled={isReadOnly} />
+              <Checkbox checked={report.learning_observation} onChange={(v) => set("learning_observation", v)} label="觀察" disabled={isReadOnly} />
+              <Checkbox checked={report.learning_other} onChange={(v) => set("learning_other", v)} label="其他" disabled={isReadOnly} />
             </div>
           </div>
 
@@ -844,17 +955,17 @@ export default function DailyReportPage() {
             <Textarea
               value={report.action_content}
               onChange={(e) => set("action_content", e.target.value)}
-              disabled={existing && !editing}
+              disabled={isReadOnly}
               rows={3}
               className="mt-1 bg-background border-border"
             />
             <p className="text-sm text-muted-foreground mt-3 mb-2">行動領域</p>
             <div className="flex flex-wrap gap-4">
-              <Checkbox checked={report.action_career} onChange={(v) => set("action_career", v)} label="事業" disabled={existing && !editing} />
-              <Checkbox checked={report.action_wealth} onChange={(v) => set("action_wealth", v)} label="財富" disabled={existing && !editing} />
-              <Checkbox checked={report.action_health} onChange={(v) => set("action_health", v)} label="健康" disabled={existing && !editing} />
-              <Checkbox checked={report.action_family} onChange={(v) => set("action_family", v)} label="家庭" disabled={existing && !editing} />
-              <Checkbox checked={report.action_relationship} onChange={(v) => set("action_relationship", v)} label="關係" disabled={existing && !editing} />
+              <Checkbox checked={report.action_career} onChange={(v) => set("action_career", v)} label="事業" disabled={isReadOnly} />
+              <Checkbox checked={report.action_wealth} onChange={(v) => set("action_wealth", v)} label="財富" disabled={isReadOnly} />
+              <Checkbox checked={report.action_health} onChange={(v) => set("action_health", v)} label="健康" disabled={isReadOnly} />
+              <Checkbox checked={report.action_family} onChange={(v) => set("action_family", v)} label="家庭" disabled={isReadOnly} />
+              <Checkbox checked={report.action_relationship} onChange={(v) => set("action_relationship", v)} label="關係" disabled={isReadOnly} />
             </div>
           </div>
 
@@ -866,7 +977,7 @@ export default function DailyReportPage() {
               <Textarea
                 value={report.sharing_content}
                 onChange={(e) => set("sharing_content", e.target.value)}
-                disabled={existing && !editing}
+                disabled={isReadOnly}
                 rows={4}
                 className="mt-1 bg-background border-border"
               />
@@ -877,7 +988,7 @@ export default function DailyReportPage() {
               <Textarea
                 value={report.gratitude}
                 onChange={(e) => set("gratitude", e.target.value)}
-                disabled={existing && !editing}
+                disabled={isReadOnly}
                 rows={4}
                 className="mt-1 bg-background border-border"
               />
@@ -895,7 +1006,7 @@ export default function DailyReportPage() {
                     type="range" min={1} max={10}
                     value={report.daily_score}
                     onChange={(e) => set("daily_score", parseInt(e.target.value))}
-                    disabled={existing && !editing}
+                    disabled={isReadOnly}
                     className="w-full mt-1 accent-gold"
                   />
                 </div>
@@ -907,7 +1018,7 @@ export default function DailyReportPage() {
                         type="radio" name="compare"
                         checked={report.compare_yesterday === "better"}
                         onChange={() => set("compare_yesterday", "better")}
-                        disabled={existing && !editing}
+                        disabled={isReadOnly}
                         className="accent-gold"
                       />
                       <span className="text-sm">好</span>
@@ -917,7 +1028,7 @@ export default function DailyReportPage() {
                         type="radio" name="compare"
                         checked={report.compare_yesterday === "worse"}
                         onChange={() => set("compare_yesterday", "worse")}
-                        disabled={existing && !editing}
+                        disabled={isReadOnly}
                         className="accent-gold"
                       />
                       <span className="text-sm">差</span>
@@ -929,7 +1040,7 @@ export default function DailyReportPage() {
                   <Textarea
                     value={report.score_note}
                     onChange={(e) => set("score_note", e.target.value)}
-                    disabled={existing && !editing}
+                    disabled={isReadOnly}
                     rows={2}
                     className="mt-1 bg-background border-border"
                   />
@@ -942,7 +1053,7 @@ export default function DailyReportPage() {
               <Textarea
                 value={report.tomorrow_action}
                 onChange={(e) => set("tomorrow_action", e.target.value)}
-                disabled={existing && !editing}
+                disabled={isReadOnly}
                 rows={6}
                 className="mt-1 bg-background border-border"
               />
@@ -955,7 +1066,7 @@ export default function DailyReportPage() {
               checked={report.announced_in_group}
               onChange={(v) => set("announced_in_group", v)}
               label="是否已在群裡完成公佈？"
-              disabled={existing && !editing}
+              disabled={isReadOnly}
             />
           </div>
 
@@ -1151,11 +1262,7 @@ export default function DailyReportPage() {
                     key={r.report_date}
                     type="button"
                     onClick={() => {
-                      if (r.report_date === today) {
-                        setSelectedDate("");
-                      } else {
-                        switchDate(r.report_date);
-                      }
+                      switchDate(r.report_date);
                       setShowHistory(false);
                       window.scrollTo({ top: 0, behavior: "smooth" });
                     }}
