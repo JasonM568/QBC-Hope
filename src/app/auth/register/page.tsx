@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { suggestEmail } from "@/lib/email-typo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 
 export default function RegisterPage() {
@@ -159,9 +160,9 @@ export default function RegisterPage() {
           </div>
           <div>
             <Label htmlFor="password">密碼</Label>
-            <Input
+            <PasswordInput
               id="password"
-              type="password"
+              autoComplete="new-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="至少 6 個字元"

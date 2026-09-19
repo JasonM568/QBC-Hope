@@ -6,6 +6,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 
 function LoginForm() {
@@ -95,9 +96,8 @@ function LoginForm() {
         </div>
         <div>
           <Label htmlFor="password">密碼</Label>
-          <Input
+          <PasswordInput
             id="password"
-            type="password"
             autoCapitalize="none"
             autoCorrect="off"
             autoComplete="current-password"

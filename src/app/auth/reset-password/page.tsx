@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 
 export default function ResetPasswordPage() {
@@ -197,8 +197,9 @@ export default function ResetPasswordPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <Label htmlFor="password">新密碼</Label>
-              <Input
-                id="password" type="password"
+              <PasswordInput
+                id="password"
+                autoComplete="new-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="至少 6 個字元" required
@@ -207,8 +208,9 @@ export default function ResetPasswordPage() {
             </div>
             <div>
               <Label htmlFor="confirm">確認新密碼</Label>
-              <Input
-                id="confirm" type="password"
+              <PasswordInput
+                id="confirm"
+                autoComplete="new-password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="再次輸入新密碼" required
