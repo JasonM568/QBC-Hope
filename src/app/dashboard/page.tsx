@@ -126,6 +126,24 @@ export default async function DashboardPage() {
           </p>
         </div>
 
+        {/* 尚未啟動計畫：新會員登入後最先看到的引導，避免不知道要去哪打卡 */}
+        {!planStartDate && (
+          <div className="mb-8 p-4 rounded-xl border border-gold/40 bg-gold/5">
+            <p className="text-sm font-semibold text-gold">
+              你還沒啟動 21 天行動計畫
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              啟動後系統才會開始計算天數，之後才能開始每天打卡。點下方按鈕，選擇起始日就能開始。
+            </p>
+            <Link
+              href="/forms/daily"
+              className="inline-block mt-3 px-4 py-2 rounded-lg bg-gold text-black text-sm font-semibold hover:bg-gold-light transition-colors"
+            >
+              前往啟動計畫
+            </Link>
+          </div>
+        )}
+
         {/* 漏填提醒：昨天沒填，只剩今天能補 */}
         {missedYesterday && (
           <div className="mb-8 p-4 rounded-xl border border-yellow-400/40 bg-yellow-400/5">

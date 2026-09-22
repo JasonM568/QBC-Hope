@@ -688,12 +688,14 @@ export default function DailyReportPage() {
           );
         })()}
 
-        {/* 計畫啟動區塊 */}
+        {/* 計畫啟動區塊：新會員第一次進來一定會先卡在這裡，視覺要跟下面的日報表單明顯區隔開，
+            不然容易被誤認成裝飾區塊，直接往下滑找打卡欄位。 */}
         {!planStartDate && !loading && (
-          <div className="p-6 rounded-xl border border-gold/30 bg-card mb-6 space-y-4">
-            <h2 className="font-bold text-gold text-lg">啟動 21 天行動計畫</h2>
+          <div className="p-6 rounded-xl border-2 border-gold bg-gold/5 mb-6 space-y-4">
+            <p className="text-xs font-semibold text-gold uppercase tracking-wide">第一步・必須先完成</p>
+            <h2 className="font-bold text-gold text-lg">啟動 21 天行動計畫，才能開始打卡</h2>
             <p className="text-sm text-muted-foreground">
-              請選擇你的計畫起始日，系統將自動計算每天是第幾天。
+              請先選擇你的計畫起始日並啟動，系統才會正確計算今天是第幾天、也才會計入 21 天達成率。
             </p>
             <div>
               <Label className="mb-1 block">計畫起始日</Label>
