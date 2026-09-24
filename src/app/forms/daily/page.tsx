@@ -158,6 +158,9 @@ export default function DailyReportPage() {
   const [startingSaving, setStartingSaving] = useState(false);
   const [planRound, setPlanRound] = useState(1);
   const [roundResetUsed, setRoundResetUsed] = useState(false);
+  // 教練特例補填區間（profiles.backfill_from / backfill_until），兩個都有值才生效
+  const [backfillFrom, setBackfillFrom] = useState<string | null>(null);
+  const [backfillUntil, setBackfillUntil] = useState<string | null>(null);
   const [today, setToday] = useState("");
   const [selectedDate, setSelectedDate] = useState("");
   const [showHistory, setShowHistory] = useState(false);
@@ -174,7 +177,11 @@ export default function DailyReportPage() {
   // 日期調整僅允許前後 1 天（昨天／今天／明天），避免補填任意日期灌「連續打卡」點數
   const yesterday = today ? addDaysISO(today, -1) : "";
   const tomorrow = today ? addDaysISO(today, 1) : "";
-  const canCreateForActive = !!today && activeDate >= yesterday && activeDate <= tomorrow;
+  // 教練特例：截止日之前，可補填 backfill_from～今天 之間的任一天（個案補寫用，例如頁面壞掉那幾天）
+  const backfillActive = !!today && !!backfillFrom && !!backfillUntil && today <= backfillUntil;
+  const inBackfillWindow = backfillActive && activeDate >= backfillFrom! && activeDate <= today;
+  const canCreateForActive =
+    (!!today && activeDate >= yesterday && activeDate <= tomorrow) || inBackfillWindow;
 
   // 表單唯讀判斷。兩種情況：
   //  1. 已存在的日報 → 非編輯模式時唯讀
@@ -275,13 +282,15 @@ export default function DailyReportPage() {
       // 載入計畫起始日與姓名
       const { data: profile } = await supabase
         .from("profiles")
-        .select("plan_start_date, plan_round, display_name, round_reset_used")
+        .select("plan_start_date, plan_round, display_name, round_reset_used, backfill_from, backfill_until")
         .eq("id", user.id)
         .single();
 
       setUserName(profile?.display_name || user.user_metadata?.display_name || user.email || "");
 
       setRoundResetUsed(profile?.round_reset_used || false);
+      setBackfillFrom(profile?.backfill_from ?? null);
+      setBackfillUntil(profile?.backfill_until ?? null);
 
       let next: DailyReport = emptyReport;
 
@@ -777,6 +786,17 @@ export default function DailyReportPage() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {backfillActive && (
+            <div className="p-4 rounded-xl border border-gold/40 bg-gold/5">
+              <p className="text-sm font-semibold text-gold">
+                教練已為你開放補填 {backfillFrom} ～ {today} 的日報
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                期限到 {backfillUntil}（含當天）。用上方「指定日期」切換到要補的那一天，填完按送出即可。
+              </p>
+            </div>
+          )}
+
           {/* 超出補填窗口：在最上面就講清楚，並且整份表單唯讀。
               以前欄位是可以打字的，使用者會寫完一整篇才發現沒有送出鍵。 */}
           {!existing && !canCreateForActive && (
