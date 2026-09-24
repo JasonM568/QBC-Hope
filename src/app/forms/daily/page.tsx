@@ -13,6 +13,7 @@ import ReportPreview from "@/components/report-preview";
 import {
   addDaysISO,
   computeCompletion,
+  taipeiToday,
   findRecoverableMiss,
   rateTone,
 } from "@/lib/plan/completion";
@@ -192,7 +193,7 @@ export default function DailyReportPage() {
 
   // 計算指定日期是第幾天（每輪從 plan_start_date 起算 Day 1）
   function calcDayNumber(startDate: string, _round: number, forDate?: string): number {
-    const todayStr = forDate || today || new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" });
+    const todayStr = forDate || today || taipeiToday();
     const [sy, sm, sd] = startDate.split("-").map(Number);
     const [ty, tm, td] = todayStr.split("-").map(Number);
     const startMs = Date.UTC(sy, sm - 1, sd);
@@ -261,8 +262,11 @@ export default function DailyReportPage() {
 
   useEffect(() => {
     // 在 client 端即時計算台灣日期，避免靜態預渲染導致日期錯誤
-    const clientToday = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" });
+    const clientToday = taipeiToday();
     setToday(clientToday);
+    // 起始日預設今天：以前留空、按鈕又在沒選日期前停用，iOS 的空白 date 欄位
+    // 不顯示任何提示字，新會員按了沒反應就以為按鈕壞掉。
+    setPlanInputDate((prev) => prev || clientToday);
 
     async function load() {
       const supabase = createClient();
@@ -699,7 +703,24 @@ export default function DailyReportPage() {
             </p>
             <div>
               <Label className="mb-1 block">計畫起始日</Label>
-              <p className="text-xs text-muted-foreground mb-2">請點選下方欄位選擇日期（最晚為今天）</p>
+              <p className="text-xs text-muted-foreground mb-2">已預設為今天。昨天才開始的話可直接切換；更早的日期請用下方欄位選（最晚為今天）</p>
+              <div className="flex gap-1.5 mb-2">
+                {[{ n: 0, l: "今天" }, { n: -1, l: "昨天" }].map(({ n, l }) => {
+                  const d = today ? addDaysISO(today, n) : "";
+                  const sel = planInputDate === d;
+                  return (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => setPlanInputDate(d)}
+                      disabled={!today}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${sel ? "bg-gold text-black" : "bg-background border border-border text-muted-foreground hover:text-foreground"}`}
+                    >
+                      {l}（{d.slice(5)}）
+                    </button>
+                  );
+                })}
+              </div>
               <Input
                 type="date"
                 value={planInputDate}
@@ -723,7 +744,7 @@ export default function DailyReportPage() {
             <Button
               type="button"
               onClick={startPlan}
-              disabled={startingSaving || !planInputDate}
+              disabled={startingSaving}
               className="w-full bg-gold text-black hover:bg-gold-light font-semibold h-12"
             >
               {startingSaving ? "啟動中..." : "啟動計畫"}

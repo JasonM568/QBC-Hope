@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { taipeiToday } from "@/lib/plan/completion";
 import Navbar from "@/components/layout/navbar";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -457,7 +458,7 @@ export default function StrategyPage() {
 
           <ReportPreview
             reportTitle="個人戰略定位工具"
-            date={new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" })}
+            date={taipeiToday()}
             userName={userName}
             gridLayout
             sections={[
@@ -524,7 +525,7 @@ export default function StrategyPage() {
             onExportPDF={() =>
               exportPDF({
                 reportTitle: "個人戰略定位工具",
-                date: new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" }),
+                date: taipeiToday(),
                 userName,
                 sections: [
                   { title: "PART 1：優勢分析", content: [

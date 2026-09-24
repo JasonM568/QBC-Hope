@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { taipeiToday } from "@/lib/plan/completion";
 import Navbar from "@/components/layout/navbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -456,7 +457,7 @@ export default function CapitalInventoryPage() {
 
           <ReportPreview
             reportTitle="人生資本盤點表"
-            date={new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" })}
+            date={taipeiToday()}
             userName={userName}
             sections={[
               { title: "基本資訊", items: [
@@ -533,7 +534,7 @@ export default function CapitalInventoryPage() {
             onExportPDF={() =>
               exportPDF({
                 reportTitle: "人生資本盤點表",
-                date: new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" }),
+                date: taipeiToday(),
                 userName,
                 sections: [
                   { title: "基本資訊", content: [

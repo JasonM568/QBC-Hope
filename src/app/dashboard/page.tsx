@@ -7,6 +7,7 @@ import {
   computeCompletion,
   findRecoverableMiss,
   rateTone,
+  taipeiToday,
 } from "@/lib/plan/completion";
 
 export default async function DashboardPage() {
@@ -22,7 +23,7 @@ export default async function DashboardPage() {
     .single();
 
   const displayName = profile?.display_name || user.user_metadata?.display_name || user.email;
-  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" });
+  const today = taipeiToday();
   const planStartDate = profile?.plan_start_date || null;
   const planRound = profile?.plan_round || 1;
 

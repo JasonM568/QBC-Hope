@@ -29,9 +29,28 @@ export function roundEndDate(startDate: string): string {
   return addDaysISO(startDate, ROUND_LENGTH - 1);
 }
 
+/**
+ * 台北日期字串 YYYY-MM-DD。
+ *
+ * 不可用 toLocaleDateString("en-CA")：iOS 17 Safari 會回 "9/24/2026"，
+ * 後續 addDaysISO 解析成 NaN、toISOString() 直接丟錯，日報頁整頁白掉
+ * （2026-09-24 楊秋萍 iPhone 因此無法啟動 21 天計畫）。
+ * formatToParts 各欄位獨立取值，與瀏覽器的語系格式無關。
+ */
+export function taipeiDate(date: Date = new Date()): string {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Taipei",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
+  return `${get("year")}-${get("month")}-${get("day")}`;
+}
+
 /** 今天的台北日期字串 */
 export function taipeiToday(): string {
-  return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" });
+  return taipeiDate();
 }
 
 export interface CompletionResult {
